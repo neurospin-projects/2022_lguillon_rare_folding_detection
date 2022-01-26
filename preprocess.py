@@ -39,6 +39,8 @@ import random
 import torch
 import torchvision.transforms as transforms
 
+from config import Config
+
 
 class SkeletonDataset():
     """Custom dataset for skeleton images that includes image file paths.
@@ -57,6 +59,7 @@ class SkeletonDataset():
         self.filenames = filenames
         self.visu_check = visu_check
         self.min_size = min_size
+        self.config = Config()
 
     def __len__(self):
         return len(self.df)
@@ -74,20 +77,24 @@ class SkeletonDataset():
 
         self.transform = transforms.Compose([randomSuppression(labels, self.min_size),
                          NormalizeSkeleton(),
-                         Padding([1, 40, 40, 60], fill_value=fill_value)
+                         Padding(list(self.config.in_shape), fill_value=fill_value)
                          ])
-        transf_sample = self.transform(np.copy(sample))
+        transf_sample, target = self.transform(np.copy(sample))
+
+        padding = transforms.Compose([
+                 Padding(list(self.config.in_shape), fill_value=fill_value)])
+
         tuple_with_path = (transf_sample, filename)
 
         if self.visu_check:
             self.transform_1 = transforms.Compose([NormalizeSkeleton(),
-                               Padding([1, 40, 40, 60], fill_value=fill_value)
+                               Padding(list(self.config.in_shape), fill_value=fill_value)
                                ])
             orig_sample = self.transform_1(sample)
-            return tuple_with_path, orig_sample
+            return tuple_with_path, padding(target), orig_sample
 
         else:
-            return tuple_with_path
+            return tuple_with_path, padding(target)
 
 
 class randomSuppression(object):
@@ -96,7 +103,6 @@ class randomSuppression(object):
     def __init__(self, foldlabel_map, min_size=100):
         #self.sample = sample
         self.foldlabel_map = foldlabel_map
-        print(type(self.foldlabel_map))
         self.min_size = min_size
 
     def random_choice(self):
@@ -112,14 +118,14 @@ class randomSuppression(object):
         fold = random.choice(list(folds_dico.keys()))
 
         # if fold size < 100, deletion of other folds
-        if folds_dico[fold]<100:
+        if folds_dico[fold]<self.min_size:
             if folds_dico[fold]>5 :
                 total_del = folds_dico[fold]
                 self.del_list.append(fold)
                 folds_dico.pop(fold, None)
             while total_del <= self.min_size:
-                print(total_del)
-                fold = random.choice([k for k, v in folds_dico.items() if v<self.min_size])
+                #print(total_del)
+                fold = random.choice([k for k, v in folds_dico.items() if v<self.min_size and v>5])
                 total_del += folds_dico[fold]
                 self.del_list.append(fold)
                 folds_dico.pop(fold, None)
@@ -128,19 +134,24 @@ class randomSuppression(object):
             self.del_list.append(fold)
 
     def __call__(self, sample):
+        target = np.zeros(list(sample.shape))
+        assert(target.shape==sample.shape)
+
         self.random_choice()
-        print(sample.shape, self.foldlabel_map.shape)
 
         for fold in self.del_list:
             self.foldlabel_map[self.foldlabel_map==fold] = 9999
 
-        print(np.unique(self.foldlabel_map, return_counts=True))
-
         ## suppression of chosen folds
-        print(np.unique(sample, return_counts=True))
+        old = np.unique(sample, return_counts=True)
         sample[self.foldlabel_map==9999] = 0
-        print(np.unique(sample, return_counts=True))
-        return sample
+        new = np.unique(sample, return_counts=True)
+        assert(new[1][0]-old[1][0]>=self.min_size-50)
+
+        ## writing of deleted folds to reconstruct in target
+        target[self.foldlabel_map==9999] = 1
+
+        return sample, target
 
 
 class NormalizeSkeleton(object):
@@ -154,14 +165,18 @@ class NormalizeSkeleton(object):
         self.nb_cls = nb_cls
 
     def __call__(self, arr):
-        if self.nb_cls==2:
-            arr[arr > 0] = 1
+        if len(arr)>1 and self.nb_cls==2:
+            arr[0][arr[0]>0]=1
         else:
+            if self.nb_cls==2:
+                arr[arr > 0] = 1
+        """else:
             arr[arr==40]=30
             arr[arr==70]=80
             arr[arr==30]=1
             arr[arr==60]=2
             arr[arr==80]=3
+        print(type(arr))"""
         return arr
 
 
@@ -199,15 +214,26 @@ class Padding(object):
         fill_arr: np.array
             the zero padded array.
         """
-        if len(arr.shape) - len(self.shape) == 1:
-            data = []
-            for _arr, _fill_value in zip(arr, self.fill_value):
-                data.append(self._apply_padding(_arr, _fill_value))
-            return np.asarray(data)
-        elif len(arr.shape) - len(self.shape) == 0:
-            return self._apply_padding(arr, self.fill_value)
+        if len(arr)>1:
+            if len(arr[0].shape) - len(self.shape) == 1:
+                data = []
+                for _arr, _fill_value in zip(arr[0], self.fill_value):
+                    data.append(self._apply_padding(_arr, _fill_value))
+                return np.asarray(data)
+            elif len(arr[0].shape) - len(self.shape) == 0:
+                return (self._apply_padding(arr[0], self.fill_value), arr[1])
+            else:
+                raise ValueError("Wrong input shape specified!")
         else:
-            raise ValueError("Wrong input shape specified!")
+            if len(arr.shape) - len(self.shape) == 1:
+                data = []
+                for _arr, _fill_value in zip(arr, self.fill_value):
+                    data.append(self._apply_padding(_arr, _fill_value))
+                return np.asarray(data)
+            elif len(arr.shape) - len(self.shape) == 0:
+                return self._apply_padding(arr, self.fill_value)
+            else:
+                raise ValueError("Wrong input shape specified!")
 
     def _apply_padding(self, arr, fill_value):
         """ See Padding.__call__().
