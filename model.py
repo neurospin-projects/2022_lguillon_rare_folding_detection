@@ -85,7 +85,7 @@ class InpaintAE(nn.Module):
         for step in range(depth-1):
             in_channels = out_channels
             out_channels = in_channels // 2
-            ini = 1 if step==0 else 0
+            ini = 0 if step==0 else 0
             modules_decoder.append(('convTrans3d%s' %step, nn.ConvTranspose3d(in_channels,
                         out_channels, kernel_size=2, stride=2, padding=0, output_padding=(ini,0,0))))
             modules_decoder.append(('normup%s' %step, nn.BatchNorm3d(out_channels)))
@@ -130,11 +130,12 @@ class InpaintAE(nn.Module):
 
     def forward(self, x):
         encoded = self.encode(x)
-        out = self.decode(z)
+        out = self.decode(encoded)
         return out, encoded
 
 
-def inpaint_loss(output, input, mean, logvar, loss_func, kl_weight):
+def inpaint_loss(output, input, loss_func):
     recon_loss = loss_func(output, input)
-    kl_loss = -0.5 * torch.sum(-torch.exp(logvar) - mean**2 + 1. + logvar)
-    return recon_loss, kl_loss, recon_loss + kl_weight * kl_loss
+    #kl_loss = -0.5 * torch.sum(-torch.exp(logvar) - mean**2 + 1. + logvar)
+    #return recon_loss, kl_loss, recon_loss + kl_weight * kl_loss
+    return recon_loss
