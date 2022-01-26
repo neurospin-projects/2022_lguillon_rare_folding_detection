@@ -51,9 +51,12 @@ class SkeletonDataset():
         tuple_with_path: tuple of type (sample, filename) with sample normalized
                          and padded
     """
-    def __init__(self, dataframe, filenames=None):
+    def __init__(self, dataframe, filenames=None, min_size=100,
+                 visu_check=False):
         self.df = dataframe
         self.filenames = filenames
+        self.visu_check = visu_check
+        self.min_size = min_size
 
     def __len__(self):
         return len(self.df)
@@ -66,15 +69,25 @@ class SkeletonDataset():
             filename = self.filenames[idx]
             sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['skeleton']), axis=0)
             labels = np.expand_dims(np.squeeze(self.df.iloc[idx]['labels']), axis=0)
-        print(filename)
+
         fill_value = 0
-        self.transform = transforms.Compose([randomSuppression(labels),
+
+        self.transform = transforms.Compose([randomSuppression(labels, self.min_size),
                          NormalizeSkeleton(),
                          Padding([1, 40, 40, 60], fill_value=fill_value)
                          ])
-        sample = self.transform(sample)
-        tuple_with_path = (sample, filename)
-        return tuple_with_path
+        transf_sample = self.transform(np.copy(sample))
+        tuple_with_path = (transf_sample, filename)
+
+        if self.visu_check:
+            self.transform_1 = transforms.Compose([NormalizeSkeleton(),
+                               Padding([1, 40, 40, 60], fill_value=fill_value)
+                               ])
+            orig_sample = self.transform_1(sample)
+            return tuple_with_path, orig_sample
+
+        else:
+            return tuple_with_path
 
 
 class randomSuppression(object):

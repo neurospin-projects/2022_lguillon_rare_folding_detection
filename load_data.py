@@ -62,7 +62,7 @@ def create_subset(config):
 
     skeletons = pd.read_pickle(os.path.join(config.data_dir, "Rskeleton.pkl")).T
     skeletons.index.astype('str')
-    print(skeletons.columns)
+
     skeletons = skeletons.rename(columns={0: "skeleton"})
 
     foldlabels = pd.read_pickle(os.path.join(config.data_dir, "Rlabels.pkl")).T
@@ -72,30 +72,39 @@ def create_subset(config):
 
     skeletons = skeletons.merge(train_list, left_on = skeletons.index, right_on='subjects', how='right')
     foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
-    print(foldlabels.head())
-    #print(foldlabels[0])
+
     filenames = list(train_list['subjects'])
-    print('ici', filenames)
-    subset = SkeletonDataset(dataframe=foldlabels, filenames=filenames)
+
+    subset = SkeletonDataset(dataframe=foldlabels.head(), filenames=filenames,
+                             min_size=config.min_size, visu_check=True)
 
     return subset
-
 
 
 def main():
     config = Config()
     subset = create_subset(config)
-    print(len(subset))
 
     trainloader = torch.utils.data.DataLoader(
                   subset,
                   batch_size=config.batch_size,
                   num_workers=8,
                   shuffle=True)
-
-    for sample, path in trainloader:
+    input_arr = []
+    output_arr = []
+    id_arr = []
+    for (sample, path), orig_sample in trainloader:
         print(path)
         print(np.unique(sample))
+        print(sample.shape)
+        for k in range(len(path)):
+            input_arr.append(np.array(np.squeeze(orig_sample[k]).cpu().detach().numpy()))
+            output_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
+            id_arr.append(path[k])
+
+    np.save(config.save_dir+'input.npy', np.array([input_arr]))
+    np.save(config.save_dir+'output.npy', np.array([output_arr]))
+    np.save(config.save_dir+'id.npy', np.array([id_arr]))
 
 
 if __name__ == '__main__':
