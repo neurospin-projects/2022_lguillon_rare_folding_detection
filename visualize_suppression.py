@@ -41,12 +41,14 @@ def main():
 
     input_arr = np.load(root_dir+'input.npy') # Input
     output_arr = np.load(root_dir+'output.npy') # Model's output
+    target_arr = np.load(root_dir+'target.npy') # Model's output
     id_arr = np.load(root_dir+'id.npy') # Subject id
     for k in range(len(id_arr[0])):
         sub_id = id_arr[0][k]
         input = input_arr[0][k]
         output = output_arr[0][k].astype(float)
-        for img, entry in [(input, 'input'), (output, 'output')]:
+        target = target_arr[0][k].astype(float)
+        for img, entry in [(input, 'input'), (output, 'output'), (target, 'target')]:
             globals()['block%s%s' % (sub_id, entry)] = a.createWindow('Axial', block=block)
 
             globals()['img%s%s' % (sub_id, entry)], globals()['a_img%s%s' % (sub_id,

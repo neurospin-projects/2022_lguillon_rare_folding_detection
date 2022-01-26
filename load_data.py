@@ -75,8 +75,8 @@ def create_subset(config):
 
     filenames = list(train_list['subjects'])
 
-    subset = SkeletonDataset(dataframe=foldlabels.head(), filenames=filenames,
-                             min_size=config.min_size, visu_check=True)
+    subset = SkeletonDataset(dataframe=foldlabels, filenames=filenames,
+                             min_size=config.min_size, visu_check=False)
 
     return subset
 
@@ -92,18 +92,22 @@ def main():
                   shuffle=True)
     input_arr = []
     output_arr = []
+    target_arr = []
     id_arr = []
-    for (sample, path), orig_sample in trainloader:
+    for (sample, path), target, orig_sample in trainloader:
         print(path)
         print(np.unique(sample))
         print(sample.shape)
+        print(target.shape)
         for k in range(len(path)):
             input_arr.append(np.array(np.squeeze(orig_sample[k]).cpu().detach().numpy()))
             output_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
+            target_arr.append(np.array(np.squeeze(target[k]).cpu().detach().numpy()))
             id_arr.append(path[k])
 
     np.save(config.save_dir+'input.npy', np.array([input_arr]))
     np.save(config.save_dir+'output.npy', np.array([output_arr]))
+    np.save(config.save_dir+'target.npy', np.array([target_arr]))
     np.save(config.save_dir+'id.npy', np.array([id_arr]))
 
 
