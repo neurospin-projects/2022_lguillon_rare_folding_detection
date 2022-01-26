@@ -101,6 +101,7 @@ class randomSuppression(object):
 
     def random_choice(self):
         self.del_list = []
+        total_del = 0
         folds_list = np.unique(self.foldlabel_map, return_counts=True)
         folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1])}
 
@@ -112,9 +113,10 @@ class randomSuppression(object):
 
         # if fold size < 100, deletion of other folds
         if folds_dico[fold]<100:
-            total_del = folds_dico[fold]
-            self.del_list.append(fold)
-            folds_dico.pop(fold, None)
+            if folds_dico[fold]>5 :
+                total_del = folds_dico[fold]
+                self.del_list.append(fold)
+                folds_dico.pop(fold, None)
             while total_del <= self.min_size:
                 print(total_del)
                 fold = random.choice([k for k, v in folds_dico.items() if v<self.min_size])
