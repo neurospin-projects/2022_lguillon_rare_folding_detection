@@ -36,16 +36,14 @@
 import numpy as np
 import pandas as pd
 from torchsummary import summary
-from torch.utils.tensorboard import SummaryWriter
 
-from model import *
+from vae import *
 from deep_folding.utils.pytorchtools import EarlyStopping
 from postprocess import plot_loss
 
-writer = SummaryWriter()
 
-def train_model(config, trainloader, valloader, root_dir=None):
-    """ Trains an inpainting AE for a given hyperparameter configuration
+def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
+    """ Trains beta-VAE for a given hyperparameter configuration
     Args:
         config: instance of class Config
         trainloader: torch loader of training data
@@ -53,22 +51,23 @@ def train_model(config, trainloader, valloader, root_dir=None):
         root_dir: str, directory where to save model
 
     Returns:
-        model: trained model
+        vae: trained model
         final_loss_val
     """
     torch.manual_seed(0)
     lr = config.lr
-    model = InpaintAE(config.in_shape, config.n, depth=3)
+    #vae = VAE(config.in_shape, curr_config['n'], depth=3)
+    vae = VAE(config.in_shape, config.n, depth=3)
     device = "cpu"
     if torch.cuda.is_available():
         device = "cuda:0"
-    model.to(device)
-    summary(model, config.in_shape)
+    vae.to(device)
+    summary(vae, config.in_shape)
 
     weights = [1, config.weight]
     class_weights = torch.FloatTensor(weights).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(vae.parameters(), lr=lr)
 
     nb_epoch = config.nb_epoch
     early_stopping = EarlyStopping(patience=12, verbose=True, root_dir=root_dir)
@@ -76,21 +75,24 @@ def train_model(config, trainloader, valloader, root_dir=None):
     list_loss_train, list_loss_val = [], []
 
     # arrays enabling to see model reconstructions
-    id_arr, phase_arr, input_arr, output_arr, target_arr = [], [], [], [], []
+    id_arr, phase_arr, input_arr, output_arr = [], [], [], []
 
     for epoch in range(config.nb_epoch):
         running_loss = 0.0
         epoch_steps = 0
-        for (inputs, path), target in trainloader:
+        for inputs, path in trainloader:
             optimizer.zero_grad()
 
             inputs = Variable(inputs).to(device, dtype=torch.float32)
-            target = torch.squeeze(target, dim=1).long().to(device)
-            out, z = model(inputs)
-            #print('out', out.shape)
-            #print('target', target.shape)
-            loss = inpaint_loss(out, target, criterion)
-            output = torch.argmax(out, dim=1)
+            target = torch.squeeze(inputs, dim=1).long()
+            output, z, logvar = vae(inputs)
+            recon_loss, kl, loss = vae_loss(output, target, z,
+                                    logvar, criterion,
+                                    kl_weight=config.kl)
+            """recon_loss, kl, loss = vae_loss(output, target, z,
+                                    logvar, criterion,
+                                    kl_weight=curr_config['kl'])"""
+            output = torch.argmax(output, dim=1)
             loss.backward()
             optimizer.step()
 
@@ -107,21 +109,22 @@ def train_model(config, trainloader, valloader, root_dir=None):
                 id_arr.append(path[k])
                 phase_arr.append('train')
                 input_arr.append(np.array(np.squeeze(inputs[k]).cpu().detach().numpy()))
-                output_arr.append(np.squeeze(out[k]).cpu().detach().numpy())
-                target_arr.append(np.squeeze(target[k]).cpu().detach().numpy())
+                output_arr.append(np.squeeze(output[k]).cpu().detach().numpy())
 
         # Validation loss
         val_loss = 0.0
         val_steps = 0
         total = 0
-        model.eval()
-        for (inputs, path), target in valloader:
+        vae.eval()
+        for inputs, path in valloader:
             with torch.no_grad():
                 inputs = Variable(inputs).to(device, dtype=torch.float32)
-                out, z = model(inputs)
-                target = torch.squeeze(target, dim=1).long().to(device)
-                loss = inpaint_loss(out, target, criterion)
-                output = torch.argmax(out, dim=1)
+                output, z, logvar = vae(inputs)
+                target = torch.squeeze(inputs, dim=1).long()
+                recon_loss_val, kl_val, loss = vae_loss(output, target,
+                                        z, logvar, criterion,
+                                        kl_weight=config.kl)
+                output = torch.argmax(output, dim=1)
 
                 val_loss += loss.cpu().numpy()
                 val_steps += 1
@@ -129,7 +132,7 @@ def train_model(config, trainloader, valloader, root_dir=None):
         print("[%d] validation loss: %.3f" % (epoch + 1, valid_loss))
         list_loss_val.append(valid_loss)
 
-        early_stopping(valid_loss, model)
+        early_stopping(valid_loss, vae)
 
         """ Saving of reconstructions for visualization in Anatomist software """
         if early_stopping.early_stop or epoch == nb_epoch-1:
@@ -138,20 +141,21 @@ def train_model(config, trainloader, valloader, root_dir=None):
                 phase_arr.append('val')
                 input_arr.append(np.array(np.squeeze(inputs[k]).cpu().detach().numpy()))
                 output_arr.append(np.squeeze(output[k]).cpu().detach().numpy())
-                target_arr.append(np.squeeze(target[k]).cpu().detach().numpy())
             break
     for key, array in {'input': input_arr, 'output' : output_arr,
-                           'phase': phase_arr, 'id': id_arr, 'target': target_arr}.items():
+                           'phase': phase_arr, 'id': id_arr}.items():
         np.save(config.save_dir+key, np.array([array]))
+        #np.save(f"/neurospin/dico/lguillon/miccai_22/gridsearch_clf/n_{curr_config['n']}_kl_{curr_config['kl']}/"+key, np.array([array]))
 
     plot_loss(list_loss_train[1:], config.save_dir+'tot_train_')
     plot_loss(list_loss_val[1:], config.save_dir+'tot_val_')
+    #plot_loss(list_loss_train[1:], f"/neurospin/dico/lguillon/miccai_22/gridsearch_clf/n_{curr_config['n']}_kl_{curr_config['kl']}/"+'tot_train_')
+    #plot_loss(list_loss_val[1:], f"/neurospin/dico/lguillon/miccai_22/gridsearch_clf/n_{curr_config['n']}_kl_{curr_config['kl']}/"+'tot_val_')
     final_loss_val = list_loss_val[-1:]
 
     """Saving of trained model"""
-    """torch.save((model.state_dict(), optimizer.state_dict()),
-                config.save_dir + 'model.pt')"""
+    torch.save((vae.state_dict(), optimizer.state_dict()),
+                config.save_dir + 'vae.pt')
 
     print("Finished Training")
-    return model
-    #return model, final_loss_val
+    return vae, final_loss_val

@@ -41,6 +41,7 @@ import sys
 
 import pandas as pd
 import numpy as np
+import random
 from preprocess import *
 from config import Config
 
@@ -56,9 +57,14 @@ def create_subset(config):
         subset: Dataset corresponding to HCP
     """
     ######## TO CHANGE ########
-    train_list = pd.read_csv(config.subject_dir, header=None, usecols=[0],
-                             names=['subjects'])
+
+    train_list = pd.read_csv(config.subject_dir)
     train_list['subjects'] = train_list['subjects'].astype('str')
+
+    hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
+                           columns=["subjects"])
+    train_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
+
 
     skeletons = pd.read_pickle(os.path.join(config.data_dir, "Rskeleton.pkl")).T
     skeletons.index.astype('str')
@@ -81,33 +87,128 @@ def create_subset(config):
     return subset
 
 
+def create_benchmark_subset(config):
+    """
+    Creates dataset from benchmark data: crops of precentral and postcentral
+    sulci
+
+    Args:
+        config: instance of class Config
+
+    Returns:
+        subset: Dataset corresponding to benchmark data
+    """
+    ######## TO CHANGE ########
+    benchmark_dir_1 = config.benchmark_dir_1
+    benchmark_dir_2 = config.benchmark_dir_2
+    benchmark_list = pd.read_csv(config.benchmark_list)
+
+    benchmark_list['subjects'] = benchmark_list['subjects'].astype('str')
+    hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
+                           columns=["subjects"])
+
+    benchmark_list_1 = benchmark_list[:50].merge(hcp_sub, left_on='subjects', right_on='subjects')
+    benchmark_list_2 = benchmark_list[50:].merge(hcp_sub, left_on='subjects', right_on='subjects')
+
+    skeletons = pd.read_pickle(os.path.join(config.benchmark_dir_1, "Rskeleton.pkl")).T
+    skeletons.index.astype('str')
+
+    skeletons = skeletons.rename(columns={0: "skeleton"})
+
+    foldlabels = pd.read_pickle(os.path.join(config.data_dir, "Rlabels.pkl")).T
+    foldlabels.index.astype('str')
+    foldlabels = foldlabels.rename(columns={0: "labels"})
+    foldlabels['subjects'] = foldlabels.index.astype('str')
+
+    skeletons1 = skeletons.merge(benchmark_list_1, left_on = skeletons.index, right_on='subjects', how='right')
+
+    skeletons = pd.read_pickle(os.path.join(config.benchmark_dir_2, "Rskeleton.pkl")).T
+    skeletons.index.astype('str')
+    skeletons = skeletons.rename(columns={0: "skeleton"})
+
+    skeletons2 = skeletons.merge(benchmark_list_2, left_on = skeletons.index, right_on='subjects', how='right')
+    skeletons = pd.concat((skeletons1, skeletons2))
+    foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
+
+    filenames = list(benchmark_list['subjects'])
+
+    subset = SkeletonDataset(dataframe=foldlabels, filenames=filenames,
+                             min_size=config.min_size, visu_check=False)
+
+    return subset
+
+
+def create_one_handed_subset(config):
+    """
+    Creates dataset from benchmark data: crops of precentral and postcentral
+    sulci
+
+    Args:
+        config: instance of class Config
+
+    Returns:
+        subset: Dataset corresponding to benchmark data
+    """
+    ######## TO CHANGE ########
+    oh_dir = config.one_handed_dir
+
+    labels = pd.read_csv('/neurospin/dico/lguillon/ohbm_22/one_handed_labels.csv')
+    ctrl = labels[labels['Dominant hand']=='R']
+    one_handed = labels[labels['Group']!='CTR']
+    one_handed = labels[labels['Amp. Side']=='L']
+    amputee = one_handed[one_handed['Group']=='AMP']
+    cong = one_handed[one_handed['Group']=='CONG']
+
+    data_dir = "/neurospin/dico/data/deep_folding/current/crops/SC/mask/sulcus_based/2mm/one_handed_dataset/"
+
+    tmp3 = pd.read_pickle(oh_dir+'R_one_handed_skeleton.pkl')
+    tmp3 = tmp3.T
+    tmp3 = tmp3.rename(columns={0:'skeleton'})
+    tmp3['subjects'] = [list(tmp3.index)[k][0:4] for k in range(len(tmp3))]
+
+    controls = tmp3.merge(ctrl, left_on=tmp3.subjects, right_on='SubjID', how='inner')
+    filenames = list(controls.SubjID)
+    control_dataset = SkeletonDataset(dataframe=controls, filenames=filenames, visu_check=False)
+
+    amputee = tmp3.merge(amputee, left_on=tmp3.subjects, right_on='SubjID', how='inner')
+    filenames_amp = list(amputee.SubjID)
+    amputee_dataset = SkeletonDataset(dataframe=amputee, filenames=filenames_amp,visu_check=False)
+
+    congenital = tmp3.merge(cong, left_on=tmp3.subjects, right_on='SubjID', how='inner')
+    filenames_cong = list(cong.SubjID)
+    congenital_dataset = SkeletonDataset(dataframe=congenital, filenames=filenames_cong, visu_check=False)
+
+    return control_dataset, amputee_dataset, congenital_dataset
+
+
 def main():
     config = Config()
-    subset = create_subset(config)
+    #subset = create_subset(config)
+
+    benchmark = create_benchmark_subset(config)
 
     trainloader = torch.utils.data.DataLoader(
-                  subset,
-                  batch_size=config.batch_size,
+                  benchmark,
+                  batch_size=1,
                   num_workers=8,
-                  shuffle=True)
+                  shuffle=False)
     input_arr = []
     output_arr = []
     target_arr = []
     id_arr = []
-    for (sample, path), target, orig_sample in trainloader:
+    for sample, path in trainloader:
         print(path)
         print(np.unique(sample))
         print(sample.shape)
-        print(target.shape)
         for k in range(len(path)):
-            input_arr.append(np.array(np.squeeze(orig_sample[k]).cpu().detach().numpy()))
-            output_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
-            target_arr.append(np.array(np.squeeze(target[k]).cpu().detach().numpy()))
+            input_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
+            #output_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
+            #target_arr.append(np.array(np.squeeze(target[k]).cpu().detach().numpy()))
             id_arr.append(path[k])
 
     np.save(config.save_dir+'input.npy', np.array([input_arr]))
-    np.save(config.save_dir+'output.npy', np.array([output_arr]))
-    np.save(config.save_dir+'target.npy', np.array([target_arr]))
+    #np.save(config.save_dir+'output.npy', np.array([output_arr]))
+    #np.save(config.save_dir+'target.npy', np.array([target_arr]))
     np.save(config.save_dir+'id.npy', np.array([id_arr]))
 
 

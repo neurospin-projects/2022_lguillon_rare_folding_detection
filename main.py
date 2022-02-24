@@ -41,12 +41,18 @@ import pandas as pd
 import json
 import itertools
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 #from model import ModelTester
 from train import train_model
+from train_vae import train_vae
 #from clustering import Cluster
 from load_data import create_subset
 from config import Config
+
+
+#tb_logger = pl_loggers.TensorBoardLogger('logs')
+#writer = SummaryWriter()
 
 
 if __name__ == '__main__':
@@ -57,21 +63,26 @@ if __name__ == '__main__':
     save_dir = config.save_dir
 
     """ Load data and generate torch datasets """
+    # if config.model == 'vae':
+    #     subset1 = create_vae_subset(config)
+    # else:
     subset1 = create_subset(config)
     train_set, val_set = torch.utils.data.random_split(subset1,
                             [round(0.8*len(subset1)), round(0.2*len(subset1))])
     trainloader = torch.utils.data.DataLoader(
                   train_set,
                   batch_size=config.batch_size,
-                  num_workers=8,
+                  num_workers=1,
                   shuffle=True)
     valloader = torch.utils.data.DataLoader(
                 val_set,
-                batch_size=1,
+                batch_size=8,
                 num_workers=8,
                 shuffle=True)
+    print(len(train_set), len(val_set))
+    print(len(trainloader), len(valloader))
 
-    val_label = []
+    #val_label = []
     #for _, path in valloader:
     #    val_label.append(path[0])
     #np.savetxt(f"{save_dir}val_label.csv", np.array(val_label), delimiter =", ", fmt ='% s')
@@ -80,12 +91,14 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         device = "cuda:0"
 
-    weights = [1, 2]
+    weights = [1, config.weight]
+    if config.model == 'vae':
+        weights = [1, 2]
     class_weights = torch.FloatTensor(weights).to(device)
     criterion = torch.nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
 
 
-    cur_config = { "n": config.n}
+    cur_config = { "n": config.n, "weight": weights}
     try:
         os.mkdir(save_dir)
     except FileExistsError:
@@ -94,8 +107,11 @@ if __name__ == '__main__':
     print(cur_config)
 
     """ Train model for given configuration """
-    model = train_model(config, trainloader, valloader,
-                                    root_dir=save_dir)
+    if config.model == 'vae':
+        model, final_loss_val = train_vae(config, trainloader, valloader,
+                                          root_dir=save_dir)
+    else:
+        model = train_model(config, trainloader, valloader, root_dir=save_dir)
 
     """ Evaluate model performances """
     """dico_set_loaders = {'train': trainloader, 'val': valloader}

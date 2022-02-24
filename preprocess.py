@@ -38,6 +38,8 @@ import pandas as pd
 import random
 import torch
 import torchvision.transforms as transforms
+from scipy.ndimage import rotate
+from sklearn.preprocessing import OneHotEncoder
 
 from config import Config
 
@@ -55,6 +57,7 @@ class SkeletonDataset():
     """
     def __init__(self, dataframe, filenames=None, min_size=100,
                  visu_check=False):
+        torch.manual_seed(17)
         self.df = dataframe
         self.filenames = filenames
         self.visu_check = visu_check
@@ -68,33 +71,97 @@ class SkeletonDataset():
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        if self.filenames:
-            filename = self.filenames[idx]
-            sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['skeleton']), axis=0)
-            labels = np.expand_dims(np.squeeze(self.df.iloc[idx]['labels']), axis=0)
+        if self.config.model == 'vae':
+            if self.filenames:
+                #filename = self.filenames[idx]
+                sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['skeleton']), axis=0)
+                filename = self.df.iloc[idx]['subjects']
 
-        fill_value = 0
-
-        self.transform = transforms.Compose([randomSuppression(labels, self.min_size),
-                         NormalizeSkeleton(),
-                         Padding(list(self.config.in_shape), fill_value=fill_value)
-                         ])
-        transf_sample, target = self.transform(np.copy(sample))
-
-        padding = transforms.Compose([
-                 Padding(list(self.config.in_shape), fill_value=fill_value)])
-
-        tuple_with_path = (transf_sample, filename)
-
-        if self.visu_check:
-            self.transform_1 = transforms.Compose([NormalizeSkeleton(),
-                               Padding(list(self.config.in_shape), fill_value=fill_value)
-                               ])
-            orig_sample = self.transform_1(sample)
-            return tuple_with_path, padding(target), orig_sample
+            fill_value = 0
+            """self.transform = transforms.Compose([RotateTensor(), NormalizeSkeleton(),
+                                transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
+                                Padding(list(self.config.in_shape), fill_value=fill_value)
+                                   ])"""
+            self.transform = transforms.Compose([NormalizeSkeleton(),
+                                Padding(list(self.config.in_shape), fill_value=fill_value)
+                                   ])
+            tuple_with_path = (self.transform(sample), filename)
+            #print(np.unique(tuple_with_path[0]))
+            #np.save(f"/neurospin/dico/lguillon/miccai_22/aug_{filename}.npy", tuple_with_path[0])
+            return tuple_with_path
 
         else:
-            return tuple_with_path, padding(target)
+            if self.filenames:
+                #filename = self.filenames[idx]
+                sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['skeleton']), axis=0)
+                filename = self.df.iloc[idx]['subjects']
+                labels = np.expand_dims(np.squeeze(self.df.iloc[idx]['labels']), axis=0)
+
+            fill_value = 0
+            self.transform = transforms.Compose([randomSuppression(labels, self.min_size),
+                             NormalizeSkeleton(),
+                             Padding(list(self.config.in_shape), fill_value=fill_value)
+                             ])
+            transf_sample, target = self.transform(np.copy(sample))
+
+            padding = transforms.Compose([
+                     Padding(list(self.config.in_shape), fill_value=fill_value)])
+
+            tuple_with_path = (transf_sample, filename)
+
+            if self.visu_check:
+                self.transform_1 = transforms.Compose([NormalizeSkeleton(),
+                                   Padding(list(self.config.in_shape), fill_value=fill_value)
+                                   ])
+                orig_sample = self.transform_1(sample)
+                return tuple_with_path, padding(target), orig_sample
+
+            else:
+                return tuple_with_path, padding(target)
+
+
+class RotateTensor(object):
+    """Apply a random rotation on the images
+    """
+
+    def __init__(self, max_angle=10):
+        self.max_angle = max_angle
+        torch.manual_seed(17)
+
+    def __call__(self, arr):
+        print('rotation')
+        arr = arr[0,:, :, :]
+        print(np.unique(arr,return_counts=True))
+        arr_shape = arr.shape
+        flat_im = np.reshape(arr, (-1, 1))
+        im_encoder = OneHotEncoder(sparse=False, categories='auto')
+        onehot_im = im_encoder.fit_transform(flat_im)
+        # rotate one hot im
+        onehot_im = onehot_im.reshape(*arr_shape, -1)
+        onehot_im_result = np.copy(onehot_im)
+        n_cat = onehot_im.shape[-1]
+        for axes in (0, 1), (0, 2), (1, 2):
+            np.random.seed()
+            angle = np.random.uniform(-self.max_angle, self.max_angle)
+            onehot_im_rot = np.empty_like(onehot_im)
+            for c in range(n_cat):
+                const = 1 if c == 0 else 0
+                onehot_im_rot[..., c] = rotate(onehot_im_result[..., c],
+                                               angle=angle,
+                                               axes=axes,
+                                               reshape=False,
+                                               mode='constant',
+                                               cval=const)
+            onehot_im_result = onehot_im_rot
+        im_rot_flat = im_encoder.inverse_transform(
+            np.reshape(onehot_im_result, (-1, n_cat)))
+        im_rot = np.reshape(im_rot_flat, arr_shape)
+        arr_rot = np.expand_dims(
+            im_rot,
+            axis=0)
+        print(arr_rot.shape)
+        print(np.unique(arr,return_counts=True))
+        return torch.from_numpy(arr_rot)
 
 
 class randomSuppression(object):
@@ -116,6 +183,7 @@ class randomSuppression(object):
 
         # Random choice of fold
         fold = random.choice(list(folds_dico.keys()))
+        #print(folds_dico[fold])
 
         # if fold size < 100, deletion of other folds
         if folds_dico[fold]<self.min_size:
@@ -124,11 +192,11 @@ class randomSuppression(object):
                 self.del_list.append(fold)
                 folds_dico.pop(fold, None)
             while total_del <= self.min_size:
-                #print(total_del)
-                fold = random.choice([k for k, v in folds_dico.items() if v<self.min_size and v>5])
+                fold = random.choice([k for k, v in folds_dico.items() if v>5])
                 total_del += folds_dico[fold]
                 self.del_list.append(fold)
                 folds_dico.pop(fold, None)
+
         # if fold size >= 100, suppression of this fold only
         else:
             self.del_list.append(fold)
