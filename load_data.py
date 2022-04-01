@@ -61,27 +61,26 @@ def create_subset(config):
     train_list = pd.read_csv(config.subject_dir)
     train_list['subjects'] = train_list['subjects'].astype('str')
 
-    hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
-                           columns=["subjects"])
-    train_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
+    #hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
+    #                       columns=["subjects"])
+    #train_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
 
+    distmaps = pd.read_pickle(os.path.join(config.data_dir, "Rdistmap.pkl")).T
+    distmaps.index.astype('str')
 
-    skeletons = pd.read_pickle(os.path.join(config.data_dir, "Rskeleton.pkl")).T
-    skeletons.index.astype('str')
+    distmaps = distmaps.rename(columns={0: "distmaps"})
 
-    skeletons = skeletons.rename(columns={0: "skeleton"})
-
-    foldlabels = pd.read_pickle(os.path.join(config.data_dir, "Rlabels.pkl")).T
+    """foldlabels = pd.read_pickle(os.path.join(config.data_dir, "Rlabels.pkl")).T
     foldlabels.index.astype('str')
     foldlabels = foldlabels.rename(columns={0: "labels"})
-    foldlabels['subjects'] = foldlabels.index.astype('str')
+    foldlabels['subjects'] = foldlabels.index.astype('str')"""
 
-    skeletons = skeletons.merge(train_list, left_on = skeletons.index, right_on='subjects', how='right')
-    foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
+    distmaps = distmaps.merge(train_list, left_on = distmaps.index, right_on='subjects', how='right')
+    #foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
 
     filenames = list(train_list['subjects'])
 
-    subset = SkeletonDataset(dataframe=foldlabels, filenames=filenames,
+    subset = SkeletonDataset(dataframe=distmaps, filenames=filenames,
                              min_size=config.min_size, visu_check=False)
 
     return subset
@@ -101,14 +100,16 @@ def create_benchmark_subset(config):
     ######## TO CHANGE ########
     benchmark_dir_1 = config.benchmark_dir_1
     benchmark_dir_2 = config.benchmark_dir_2
-    benchmark_list = pd.read_csv(config.benchmark_list)
+    #benchmark_list = pd.read_csv(config.benchmark_list)
+    train_list = pd.read_csv(config.subject_dir)
+    train_list['subjects'] = train_list['subjects'].astype('str')
 
-    benchmark_list['subjects'] = benchmark_list['subjects'].astype('str')
+    #benchmark_list['subjects'] = benchmark_list['subjects'].astype('str')
     hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
                            columns=["subjects"])
 
-    benchmark_list_1 = benchmark_list[:50].merge(hcp_sub, left_on='subjects', right_on='subjects')
-    benchmark_list_2 = benchmark_list[50:].merge(hcp_sub, left_on='subjects', right_on='subjects')
+    benchmark_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
+    #benchmark_list_2 = train_list[50:].merge(hcp_sub, left_on='subjects', right_on='subjects')
 
     skeletons = pd.read_pickle(os.path.join(config.benchmark_dir_1, "Rskeleton.pkl")).T
     skeletons.index.astype('str')
@@ -120,13 +121,16 @@ def create_benchmark_subset(config):
     foldlabels = foldlabels.rename(columns={0: "labels"})
     foldlabels['subjects'] = foldlabels.index.astype('str')
 
-    skeletons1 = skeletons.merge(benchmark_list_1, left_on = skeletons.index, right_on='subjects', how='right')
+    skeletons1 = skeletons.merge(benchmark_list[:int(len(benchmark_list)/2)], left_on = skeletons.index, right_on='subjects', how='right')
+    skeletons1.subjects.to_csv(f"{config.save_dir}precentral_sub_2.csv")
 
     skeletons = pd.read_pickle(os.path.join(config.benchmark_dir_2, "Rskeleton.pkl")).T
     skeletons.index.astype('str')
     skeletons = skeletons.rename(columns={0: "skeleton"})
 
-    skeletons2 = skeletons.merge(benchmark_list_2, left_on = skeletons.index, right_on='subjects', how='right')
+    skeletons2 = skeletons.merge(benchmark_list[int(len(benchmark_list)/2):], left_on = skeletons.index, right_on='subjects', how='right')
+    skeletons2.subjects.to_csv(f"{config.save_dir}postcentral_sub_2.csv")
+
     skeletons = pd.concat((skeletons1, skeletons2))
     foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
 

@@ -61,13 +61,14 @@ def anomaly_score(X_train, X_benchmark):
     return Lsf, Lnn
 
 
-def classifier(X_val, X_benchmark):
+def classifier(X_val, sub_train, X_benchmark, sub_bench):
     """
     """
-    np.random.shuffle(X_val)
     #X = np.concatenate((X_val[:100], X_benchmark))
+    subjects_dict = {}
     print(len(X_val), len(X_benchmark))
     X = np.concatenate((X_val, X_benchmark))
+    sub = np.concatenate((sub_train, sub_bench))
     label = np.array([0 for k in range(len(X_val))] + [1 for k in range(len(X_benchmark))])
     skf = StratifiedKFold(n_splits=3)
     av_log, av_svm, av_gb = [], [], []
@@ -75,16 +76,28 @@ def classifier(X_val, X_benchmark):
         clf = LogisticRegression(random_state=0).fit(X[train], label[train])
         #av_log.append(clf.score(X[test], label[test]))
         pred = clf.predict(X[test])
+        for i, k in enumerate(pred):
+            if k != label[i]:
+                if sub[i] not in subjects_dict.keys():
+                    subjects_dict[sub[i]] = 1
         av_log.append(f1_score(label[test], pred, average='weighted'))
 
         svm = LinearSVC(random_state=0).fit(X[train], label[train])
         pred = svm.predict(X[test])
+        for i, k in enumerate(pred):
+            if k != label[i]:
+                if sub[i] not in subjects_dict.keys():
+                    subjects_dict[sub[i]] = 1
         av_svm.append(f1_score(label[test], pred, average='weighted'))
 
         gb = GradientBoostingClassifier(random_state=0).fit(X[train], label[train])
         pred = gb.predict(X[test])
+        for i, k in enumerate(pred):
+            if k != label[i]:
+                if sub[i] not in subjects_dict.keys():
+                    subjects_dict[sub[i]] = str(label[i])
         av_gb.append(f1_score(label[test], pred, average='weighted'))
 
     logreg, svm, gb = np.mean(av_log), np.mean(av_svm), np.mean(av_gb)
     print(logreg, svm, gb)
-    return logreg, svm, gb
+    return logreg, svm, gb, subjects_dict

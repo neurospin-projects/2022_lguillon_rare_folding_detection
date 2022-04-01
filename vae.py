@@ -97,7 +97,7 @@ class VAE(nn.Module):
             modules_decoder.append(('ReLU%sa' %step, nn.ReLU()))
         modules_decoder.append(('convtrans3dn', nn.ConvTranspose3d(16, 1, kernel_size=2,
                         stride=2, padding=0)))
-        modules_decoder.append(('conv_final', nn.Conv3d(1, 2, kernel_size=1, stride=1)))
+        modules_decoder.append(('conv_final', nn.Conv3d(1, 1, kernel_size=1, stride=1)))
         self.decoder = nn.Sequential(OrderedDict(modules_decoder))
         self.weight_initialization()
 
@@ -143,9 +143,9 @@ class VAE(nn.Module):
         return out, mean, logvar
 
 
-def vae_loss(output, input, mean, logvar, loss_func, kl_weight):
-    recon_loss = loss_func(output, input)
-    kl_loss = -0.5 * torch.sum(-torch.exp(logvar) - mean**2 + 1. + logvar)
+def vae_loss(input, output, mean, logvar, loss_func, kl_weight):
+    recon_loss = loss_func(input, output)
+    kl_loss = torch.mean(-0.5 * torch.sum(-torch.exp(logvar) - mean**2 + 1. + logvar, dim=1), dim=0)
     return recon_loss, kl_loss, recon_loss + kl_weight * kl_loss
 
 
@@ -171,7 +171,10 @@ class ModelTester():
                                {"x2": latent_embedding_x2}
                 }
         """
+        if torch.cuda.is_available():
+            device = "cuda:0"
         self.model = model
+        self.model.to(device)
         self.dico_set_loaders = dico_set_loaders
         self.kl_weight = kl_weight
         self.n_latent = n_latent
@@ -187,6 +190,7 @@ class ModelTester():
         out_z = []
 
         for loader_name, loader in self.dico_set_loaders.items():
+            print(loader_name)
             self.model.eval()
             with torch.no_grad():
                 for inputs, path in loader:
@@ -198,10 +202,6 @@ class ModelTester():
                     output = torch.argmax(output, dim=1)
 
                     for k in range(len(path)):
-                        id_arr.append(path)
-                        input_arr.append(np.array(np.squeeze(inputs).cpu().detach().numpy()))
-                        output_arr.append(np.squeeze(output).cpu().detach().numpy())
-                        phase_arr.append(loader_name)
                         out_z = np.array(np.squeeze(z[k]).cpu().detach().numpy())
 
                         results[loader_name][path[k]] = loss_val, out_z

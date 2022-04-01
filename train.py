@@ -65,9 +65,10 @@ def train_model(config, trainloader, valloader, root_dir=None):
     model.to(device)
     summary(model, config.in_shape)
 
-    weights = [1, config.weight]
-    class_weights = torch.FloatTensor(weights).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
+    #weights = [1, config.weight]
+    #class_weights = torch.FloatTensor(weights).to(device)
+    #criterion = nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
+    criterion = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     nb_epoch = config.nb_epoch

@@ -33,6 +33,8 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license version 2 and that you accept its terms.
 
+import os
+
 import numpy as np
 import pandas as pd
 import random
@@ -41,6 +43,7 @@ import torchvision.transforms as transforms
 from scipy.ndimage import rotate
 from sklearn.preprocessing import OneHotEncoder
 
+import deep_folding as df
 from config import Config
 
 
@@ -74,17 +77,21 @@ class SkeletonDataset():
         if self.config.model == 'vae':
             if self.filenames:
                 #filename = self.filenames[idx]
-                sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['skeleton']), axis=0)
+                sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['distmaps']), axis=0)
                 filename = self.df.iloc[idx]['subjects']
 
             fill_value = 0
-            """self.transform = transforms.Compose([RotateTensor(), NormalizeSkeleton(),
+            print(filename)
+            self.transform = transforms.Compose([RotateTensor(filename), NormalizeSkeleton(),
                                 transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
                                 Padding(list(self.config.in_shape), fill_value=fill_value)
-                                   ])"""
-            self.transform = transforms.Compose([NormalizeSkeleton(),
-                                Padding(list(self.config.in_shape), fill_value=fill_value)
                                    ])
+            """self.transform = transforms.Compose([NormalizeSkeleton(),
+                                Padding(list(self.config.in_shape), fill_value=fill_value)
+                                   ])"""
+            """self.transform = transforms.Compose([Padding(list(self.config.in_shape),
+                                                 fill_value=fill_value)
+                                                ])"""
             tuple_with_path = (self.transform(sample), filename)
             #print(np.unique(tuple_with_path[0]))
             #np.save(f"/neurospin/dico/lguillon/miccai_22/aug_{filename}.npy", tuple_with_path[0])
@@ -124,16 +131,32 @@ class RotateTensor(object):
     """Apply a random rotation on the images
     """
 
-    def __init__(self, max_angle=10):
-        self.max_angle = max_angle
+    def __init__(self, filename, max_angle=10):
         torch.manual_seed(17)
+        self.config = Config()
+
+        self.max_angle = max_angle
+
+        sub_id = np.load(os.path.join(self.config.aug_dir, 'sub_id.npy'))
+        orig_file = np.load(os.path.join(self.config.aug_dir, "data.npy"), \
+                            mmap_mode='r')
+        idx = np.where(sub_id==filename)
+        self.orig_img = orig_file[idx]
+        print(self.orig_img.shape)
+
+    def crop(self):
+        self.mask, self.bbmin, self.bbmax = \
+             df.utils.compute_centered_mask(sulci_list=self.config.list_sulci,
+                                            side=self.config.side,
+                                            mask_dir=self.config.mask_dir)
+        #df.generate_crops.crop_mask(file_src, file_cropped, mask, bbmin, bbmax)
+        print(mask)
 
     def __call__(self, arr):
         print('rotation')
-        arr = arr[0,:, :, :]
-        print(np.unique(arr,return_counts=True))
+        arr = self.orig_img[0,:, :, :]
         arr_shape = arr.shape
-        flat_im = np.reshape(arr, (-1, 1))
+        """flat_im = np.reshape(arr, (-1, 1))
         im_encoder = OneHotEncoder(sparse=False, categories='auto')
         onehot_im = im_encoder.fit_transform(flat_im)
         # rotate one hot im
@@ -141,6 +164,7 @@ class RotateTensor(object):
         onehot_im_result = np.copy(onehot_im)
         n_cat = onehot_im.shape[-1]
         for axes in (0, 1), (0, 2), (1, 2):
+            print(axes)
             np.random.seed()
             angle = np.random.uniform(-self.max_angle, self.max_angle)
             onehot_im_rot = np.empty_like(onehot_im)
@@ -158,8 +182,12 @@ class RotateTensor(object):
         im_rot = np.reshape(im_rot_flat, arr_shape)
         arr_rot = np.expand_dims(
             im_rot,
-            axis=0)
+            axis=0)"""
         print(arr_rot.shape)
+        #np.save('/neurospin/dico/lguillon/distmap/rot_test.npy', arr_rot)
+
+        ### Crop
+        self.crop()
         print(np.unique(arr,return_counts=True))
         return torch.from_numpy(arr_rot)
 
@@ -237,7 +265,8 @@ class NormalizeSkeleton(object):
             arr[0][arr[0]>0]=1
         else:
             if self.nb_cls==2:
-                arr[arr > 0] = 1
+                #arr[arr > 0] = 1
+                arr[abs(arr) > 0.05] += 50
         """else:
             arr[arr==40]=30
             arr[arr==70]=80

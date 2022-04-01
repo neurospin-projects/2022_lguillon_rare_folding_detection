@@ -30,7 +30,7 @@ def main():
     Number of columns and view (Sagittal, coronal, frontal) can be specified.
     (It's better to choose an even number for number of columns to display)
     """
-    root_dir = "/neurospin/dico/lguillon/miccai_22/n_4_w_2/vae/"
+    root_dir = "/neurospin/dico/lguillon/distmap/"
 
     a = anatomist.Anatomist()
     block = a.AWindowsBlock(a, 12)  # Parameter 6 corresponds to the number of columns displayed. Can be changed.

@@ -94,9 +94,9 @@ if __name__ == '__main__':
     weights = [1, config.weight]
     if config.model == 'vae':
         weights = [1, 2]
-    class_weights = torch.FloatTensor(weights).to(device)
-    criterion = torch.nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
-
+    #class_weights = torch.FloatTensor(weights).to(device)
+    #criterion = torch.nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
+    criterion = torch.nn.MSELoss(reduction='sum')
 
     cur_config = { "n": config.n, "weight": weights}
     try:
