@@ -2,22 +2,22 @@ class Config:
 
     def __init__(self):
         self.model = 'vae'
-        self.batch_size = 1
+        self.batch_size = 8
         self.nb_epoch = 2 #300
         self.n = 40
         self.kl = 2
         self.weight = 2
         self.lr = 1e-4
-        self.in_shape = (1, 40, 40, 56) # input size with padding
+        self.in_shape = (1, 80, 56, 80) # input size with padding
         self.min_size = 300
 
         self.save_dir = f"/neurospin/dico/lguillon/distmap/"
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
-                        'hcp/crops/2mm/SC/mask/'
+                        'hcp/crops/1mm/SC/mask/'
         self.subject_dir = "/neurospin/dico/lguillon/miccai_22/data/train_list.csv"
 
         self.aug_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
-                       'hcp/distmaps/2mm/R/'
+                       'hcp/intermediate_crops_aug/'
         self.side = 'R'
         self.sulci_list = ['S.C.']
         self.mask_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \

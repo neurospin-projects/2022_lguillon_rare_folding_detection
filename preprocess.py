@@ -40,8 +40,9 @@ import pandas as pd
 import random
 import torch
 import torchvision.transforms as transforms
-from scipy.ndimage import rotate
-from sklearn.preprocessing import OneHotEncoder
+from scipy.ndimage import rotate, find_objects
+from scipy.special import expit
+from soma import aims
 
 import deep_folding as df
 from config import Config
@@ -82,8 +83,11 @@ class SkeletonDataset():
 
             fill_value = 0
             print(filename)
-            self.transform = transforms.Compose([RotateTensor(filename), NormalizeSkeleton(),
+            """self.transform = transforms.Compose([RotateTensor(filename), NormalizeSkeleton(),
                                 transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
+                                Padding(list(self.config.in_shape), fill_value=fill_value)
+                                   ])"""
+            self.transform = transforms.Compose([RotateTensor(filename), NormalizeSkeleton(),
                                 Padding(list(self.config.in_shape), fill_value=fill_value)
                                    ])
             """self.transform = transforms.Compose([NormalizeSkeleton(),
@@ -92,6 +96,7 @@ class SkeletonDataset():
             """self.transform = transforms.Compose([Padding(list(self.config.in_shape),
                                                  fill_value=fill_value)
                                                 ])"""
+            print('ici', sample.shape)
             tuple_with_path = (self.transform(sample), filename)
             #print(np.unique(tuple_with_path[0]))
             #np.save(f"/neurospin/dico/lguillon/miccai_22/aug_{filename}.npy", tuple_with_path[0])
@@ -131,64 +136,53 @@ class RotateTensor(object):
     """Apply a random rotation on the images
     """
 
-    def __init__(self, filename, max_angle=10):
+    def __init__(self, filename, max_angle=45):
         torch.manual_seed(17)
         self.config = Config()
+        self.filename = filename
 
         self.max_angle = max_angle
 
-        sub_id = np.load(os.path.join(self.config.aug_dir, 'sub_id.npy'))
-        orig_file = np.load(os.path.join(self.config.aug_dir, "data.npy"), \
+        # Load intermediate bigger crop
+        sub_id = np.load(os.path.join(self.config.aug_dir, 'Rdistmaps/sub_id.npy'))
+        orig_file = np.load(os.path.join(self.config.aug_dir, "Rdistmaps/distmap_1mm.npy"), \
                             mmap_mode='r')
         idx = np.where(sub_id==filename)
         self.orig_img = orig_file[idx]
-        print(self.orig_img.shape)
+        #print(self.orig_img.shape)
+        vol_test = aims.Volume(self.orig_img)
+        aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
 
-    def crop(self):
-        self.mask, self.bbmin, self.bbmax = \
-             df.utils.compute_centered_mask(sulci_list=self.config.list_sulci,
-                                            side=self.config.side,
-                                            mask_dir=self.config.mask_dir)
-        #df.generate_crops.crop_mask(file_src, file_cropped, mask, bbmin, bbmax)
-        print(mask)
+        # Load cropped mask
+        mask = aims.read(os.path.join(self.config.aug_dir,
+                                      'mask_distmap_cropped.nii.gz'))
+        self.mask = np.asarray(mask)
+        self.mask = np.squeeze(self.mask)
 
     def __call__(self, arr):
-        print('rotation')
-        arr = self.orig_img[0,:, :, :]
+        #print('rotation')
+        #arr = self.orig_img[0,:, :, :]
+        arr = np.squeeze(self.orig_img)
         arr_shape = arr.shape
-        """flat_im = np.reshape(arr, (-1, 1))
-        im_encoder = OneHotEncoder(sparse=False, categories='auto')
-        onehot_im = im_encoder.fit_transform(flat_im)
-        # rotate one hot im
-        onehot_im = onehot_im.reshape(*arr_shape, -1)
-        onehot_im_result = np.copy(onehot_im)
-        n_cat = onehot_im.shape[-1]
-        for axes in (0, 1), (0, 2), (1, 2):
-            print(axes)
-            np.random.seed()
-            angle = np.random.uniform(-self.max_angle, self.max_angle)
-            onehot_im_rot = np.empty_like(onehot_im)
-            for c in range(n_cat):
-                const = 1 if c == 0 else 0
-                onehot_im_rot[..., c] = rotate(onehot_im_result[..., c],
-                                               angle=angle,
-                                               axes=axes,
-                                               reshape=False,
-                                               mode='constant',
-                                               cval=const)
-            onehot_im_result = onehot_im_rot
-        im_rot_flat = im_encoder.inverse_transform(
-            np.reshape(onehot_im_result, (-1, n_cat)))
-        im_rot = np.reshape(im_rot_flat, arr_shape)
-        arr_rot = np.expand_dims(
-            im_rot,
-            axis=0)"""
-        print(arr_rot.shape)
-        #np.save('/neurospin/dico/lguillon/distmap/rot_test.npy', arr_rot)
+        angle = np.random.uniform(-self.max_angle, self.max_angle)
+        #angle = 45
+        arr_rot = rotate(arr, angle, reshape=False)
 
-        ### Crop
-        self.crop()
-        print(np.unique(arr,return_counts=True))
+        #print(1, arr_rot.shape)
+
+        arr_rot[self.mask==0] = 0
+        #print(2, arr_rot.shape)
+        arr_rot = np.expand_dims(arr_rot, axis=0)
+        #print(3, arr_rot.shape)
+
+        #vol = aims.Volume(np.expand_dims(np.squeeze(arr_rot), axis=3))
+        #arr_rot = aims.VolumeView(vol, self.bbmin, self.bbmax-self.bbmin)
+        #print(self.bbmin, self.bbmax-self.bbmin)
+        #np.save(f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.npy", arr_rot)
+        #aims.write(vol, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
+        #print(3, np.asarray(arr_rot).shape)
+
+        #return torch.from_numpy(np.asarray(arr_rot))
         return torch.from_numpy(arr_rot)
 
 
@@ -265,8 +259,12 @@ class NormalizeSkeleton(object):
             arr[0][arr[0]>0]=1
         else:
             if self.nb_cls==2:
+                print(np.unique(arr))
+                #arr[arr!=0] = expit(arr[arr!=0])
+                arr[arr!=0] = np.tanh(arr[arr!=0])
+                print(np.unique(arr))
                 #arr[arr > 0] = 1
-                arr[abs(arr) > 0.05] += 50
+                #arr[abs(arr) > 0.05] += 50
         """else:
             arr[arr==40]=30
             arr[arr==70]=80
@@ -278,63 +276,25 @@ class NormalizeSkeleton(object):
 
 
 class Padding(object):
-    """ A class to pad an image.
+    """ Apply a padding.
+    Parameters
+    ----------
+    arr: array
+        the input data.
+    shape: list of int
+        the desired shape.
+    fill_value: int, default 0
+        the value used to fill the array.
+    Returns
+    -------
+    transformed: array
+        the transformed input data.
     """
-    def __init__(self, shape, nb_channels=1, fill_value=0):
-        """ Initialize the instance.
-        Parameters
-        ----------
-        shape: list of int
-            the desired shape.
-        nb_channels: int, default 1
-            the number of channels.
-        fill_value: int or list of int, default 0
-            the value used to fill the array, if a list is given, use the
-            specified value on each channel.
-        """
+    def __init__(self, shape, fill_value=0):
         self.shape = shape
-        self.nb_channels = nb_channels
         self.fill_value = fill_value
-        if self.nb_channels > 1 and not isinstance(self.fill_value, list):
-            self.fill_value = [self.fill_value] * self.nb_channels
-        elif isinstance(self.fill_value, list):
-            assert len(self.fill_value) == self.nb_channels()
 
     def __call__(self, arr):
-        """ Fill an array to fit the desired shape.
-        Parameters
-        ----------
-        arr: np.array
-            an input array.
-        Returns
-        -------
-        fill_arr: np.array
-            the zero padded array.
-        """
-        if len(arr)>1:
-            if len(arr[0].shape) - len(self.shape) == 1:
-                data = []
-                for _arr, _fill_value in zip(arr[0], self.fill_value):
-                    data.append(self._apply_padding(_arr, _fill_value))
-                return np.asarray(data)
-            elif len(arr[0].shape) - len(self.shape) == 0:
-                return (self._apply_padding(arr[0], self.fill_value), arr[1])
-            else:
-                raise ValueError("Wrong input shape specified!")
-        else:
-            if len(arr.shape) - len(self.shape) == 1:
-                data = []
-                for _arr, _fill_value in zip(arr, self.fill_value):
-                    data.append(self._apply_padding(_arr, _fill_value))
-                return np.asarray(data)
-            elif len(arr.shape) - len(self.shape) == 0:
-                return self._apply_padding(arr, self.fill_value)
-            else:
-                raise ValueError("Wrong input shape specified!")
-
-    def _apply_padding(self, arr, fill_value):
-        """ See Padding.__call__().
-        """
         orig_shape = arr.shape
         padding = []
         for orig_i, final_i in zip(orig_shape, self.shape):
@@ -346,7 +306,80 @@ class Padding(object):
                 padding.append((half_shape_i, half_shape_i + 1))
         for cnt in range(len(arr.shape) - len(padding)):
             padding.append((0, 0))
+        return np.pad(arr, padding, mode="constant",
+                      constant_values=self.fill_value)
 
-        fill_arr = np.pad(arr, padding, mode="constant",
-                          constant_values=fill_value)
-        return fill_arr
+
+# class Padding(object):
+#     """ A class to pad an image.
+#     """
+#     def __init__(self, shape, nb_channels=1, fill_value=0):
+#         """ Initialize the instance.
+#         Parameters
+#         ----------
+#         shape: list of int
+#             the desired shape.
+#         nb_channels: int, default 1
+#             the number of channels.
+#         fill_value: int or list of int, default 0
+#             the value used to fill the array, if a list is given, use the
+#             specified value on each channel.
+#         """
+#         self.shape = shape
+#         self.nb_channels = nb_channels
+#         self.fill_value = fill_value
+#         if self.nb_channels > 1 and not isinstance(self.fill_value, list):
+#             self.fill_value = [self.fill_value] * self.nb_channels
+#         elif isinstance(self.fill_value, list):
+#             assert len(self.fill_value) == self.nb_channels()
+#
+#     def __call__(self, arr):
+#         """ Fill an array to fit the desired shape.
+#         Parameters
+#         ----------
+#         arr: np.array
+#             an input array.
+#         Returns
+#         -------
+#         fill_arr: np.array
+#             the zero padded array.
+#         """
+#         if len(arr)>1:
+#             if len(arr[0].shape) - len(self.shape) == 1:
+#                 data = []
+#                 for _arr, _fill_value in zip(arr[0], self.fill_value):
+#                     data.append(self._apply_padding(_arr, _fill_value))
+#                 return np.asarray(data)
+#             elif len(arr[0].shape) - len(self.shape) == 0:
+#                 return (self._apply_padding(arr[0], self.fill_value), arr[1])
+#             else:
+#                 raise ValueError("Wrong input shape specified!")
+#         else:
+#             if len(arr.shape) - len(self.shape) == 1:
+#                 data = []
+#                 for _arr, _fill_value in zip(arr, self.fill_value):
+#                     data.append(self._apply_padding(_arr, _fill_value))
+#                 return np.asarray(data)
+#             elif len(arr.shape) - len(self.shape) == 0:
+#                 return self._apply_padding(arr, self.fill_value)
+#             else:
+#                 raise ValueError("Wrong input shape specified!")
+#
+#     def _apply_padding(self, arr, fill_value):
+#         """ See Padding.__call__().
+#         """
+#         orig_shape = arr.shape
+#         padding = []
+#         for orig_i, final_i in zip(orig_shape, self.shape):
+#             shape_i = final_i - orig_i
+#             half_shape_i = shape_i // 2
+#             if shape_i % 2 == 0:
+#                 padding.append((half_shape_i, half_shape_i))
+#             else:
+#                 padding.append((half_shape_i, half_shape_i + 1))
+#         for cnt in range(len(arr.shape) - len(padding)):
+#             padding.append((0, 0))
+#
+#         fill_arr = np.pad(arr, padding, mode="constant",
+#                           constant_values=fill_value)
+#         return fill_arr
