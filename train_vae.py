@@ -104,7 +104,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
             running_loss += loss.item()
             epoch_steps += 1
         # addition of one reconstruction in visualization
-        print(inputs.shape, output.shape)
+        #print(inputs.shape, output.shape)
         images = [inputs[0][0][20][:][:],\
                   output[0][0][20][:][:]]
         grid = torchvision.utils.make_grid(images)

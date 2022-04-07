@@ -2,8 +2,8 @@ class Config:
 
     def __init__(self):
         self.model = 'vae'
-        self.batch_size = 8
-        self.nb_epoch = 2 #300
+        self.batch_size = 64
+        self.nb_epoch = 200 #300
         self.n = 40
         self.kl = 2
         self.weight = 2
