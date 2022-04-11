@@ -36,9 +36,9 @@
 import os
 import sys
 
-p = os.path.abspath('../')
-if p not in sys.path:
-    sys.path.append(p)
+# p = os.path.abspath('../')
+# if p not in sys.path:
+#     sys.path.append(p)
 
 import numpy as np
 import pandas as pd
@@ -46,15 +46,17 @@ import json
 import itertools
 import torch
 from sklearn.model_selection import KFold
+from torch.utils.tensorboard import SummaryWriter
 
 from vae import ModelTester
+#from preprocess import AugDatasetTransformer
 from train_vae import train_vae
 from analyses.evaluate_model import anomaly_score, classifier
-from load_data import create_subset, create_benchmark_subset, create_one_handed_subset
+from load_data import create_subset, create_benchmark_subset
 from config import Config
 
 
-def gridsearch_bVAE_sub1(subset, benchmark):
+def gridsearch_bVAE_sub1(subset, benchmark_pre, benchmark_post):
     """ Applies a gridsearch to find best hyperparameters configuration (beta
     value=kl and latent space size=n) based on loss value, silhouette score and
     reconstruction abilities
@@ -70,19 +72,23 @@ def gridsearch_bVAE_sub1(subset, benchmark):
         device = "cuda:0"
         if torch.cuda.device_count() > 1:
             vae = nn.DataParallel(vae)
-    weights = [1, config.weight]
-    class_weights = torch.FloatTensor(weights).to(device)
-    criterion = torch.nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
 
-    grid_config = {"kl": [2],
+    criterion = torch.nn.MSELoss(reduction='sum')
+
+    grid_config = {"kl": [1, 2, 4, 8, 10],
               "n": [2, 4, 10, 20, 40, 75, 100]
     }
 
-    benchloader = torch.utils.data.DataLoader(
-                  benchmark,
-                  batch_size=config.batch_size,
-                  num_workers=8,
-                  shuffle=False)
+    benchloader_pre = torch.utils.data.DataLoader(
+                      benchmark_pre,
+                      batch_size=config.batch_size,
+                      num_workers=8,
+                      shuffle=False)
+    benchloader_post = torch.utils.data.DataLoader(
+                       benchmark_post,
+                       batch_size=config.batch_size,
+                       num_workers=8,
+                       shuffle=False)
     """control_loader = torch.utils.data.DataLoader(control_dataset, batch_size=1,
                                                     shuffle=True, num_workers=8)
     amputee_loader = torch.utils.data.DataLoader(amputee_dataset, batch_size=1,
@@ -93,7 +99,7 @@ def gridsearch_bVAE_sub1(subset, benchmark):
 
     for kl, n in list(itertools.product(grid_config["kl"], grid_config["n"])):
         cur_config = {"kl": kl, "n": n}
-        root_dir = f"/neurospin/dico/lguillon/miccai_22/gridsearch_sub/n_{n}_kl_{kl}/"
+        root_dir = f"/neurospin/dico/lguillon/distmap/gridsearch/n_{n}_kl_{kl}/"
         #root_dir = config.save_dir
         res = {}
 
@@ -111,6 +117,11 @@ def gridsearch_bVAE_sub1(subset, benchmark):
         fold_logreg, fold_svm, fold_gb = [], [], []
         train_set, val_set = torch.utils.data.random_split(subset,
                             [round(0.8*len(subset)), round(0.2*len(subset))])
+
+        #train_set = AugDatasetTransformer(train_set)
+        #print(1)
+        #val_set = AugDatasetTransformer(val_set, aug=False)
+
         trainloader = torch.utils.data.DataLoader(
                   train_set,
                   batch_size=config.batch_size,
@@ -132,7 +143,10 @@ def gridsearch_bVAE_sub1(subset, benchmark):
 
         """ Evaluate model performances """
         #dico_set_loaders = {'ctrl': control_loader, 'amputee': amputee_loader, 'congenital': congenital_loader}
-        dico_set_loaders = {'train': trainloader, 'benchmark': benchloader}
+        train_set
+        dico_set_loaders = {'train': trainloader,
+                            'benchmark_pre': benchloader_pre,
+                            'benchloader_post': benchloader_post}
 
         tester = ModelTester(model=vae, dico_set_loaders=dico_set_loaders,
                              kl_weight=kl, loss_func=criterion, n_latent=n,
@@ -144,10 +158,10 @@ def gridsearch_bVAE_sub1(subset, benchmark):
         X_train = np.array(list(encoded['train']))
         #X_control = np.array(list(encoded['ctrl']) + list(encoded['amputee']) )
         #X_oh = np.array(list(encoded['congenital']))
-        X_benchmark = np.array(list(encoded['benchmark']))
+        X_benchmark_pre = np.array(list(encoded['benchmark_pre']))
         sub_train = np.array(list(results['train'].keys()))
-        sub_bench = np.array(list(results['benchmark'].keys()))
-        res_clf = classifier(X_train, sub_train, X_benchmark, sub_bench)
+        sub_bench_pre = np.array(list(results['benchmark_pre'].keys()))
+        res_clf = classifier(X_train, sub_train, X_benchmark_pre, sub_bench_pre)
         #res_clf = classifier(X_control, X_oh)
 
         #Lsf, Lnn = anomaly_score(X_train, X_benchmark)
@@ -182,10 +196,11 @@ def main():
     """ Load data and generate torch datasets """
     subset = create_subset(config)
 
-    benchmark = create_benchmark_subset(config)
+    benchmark_pre = create_benchmark_subset(config, config.benchmark_dir_1)
+    benchmark_post = create_benchmark_subset(config, config.benchmark_dir_2)
     #control_dataset, amputee_dataset, congenital_dataset = create_one_handed_subset(config)
 
-    gridsearch_bVAE_sub1(subset, benchmark)
+    gridsearch_bVAE_sub1(subset, benchmark_pre, benchmark_post)
 
 
 if __name__ == '__main__':

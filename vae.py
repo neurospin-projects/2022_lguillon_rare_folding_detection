@@ -145,7 +145,7 @@ class VAE(nn.Module):
 
 def vae_loss(input, output, mean, logvar, loss_func, kl_weight):
     recon_loss = loss_func(input, output)
-    kl_loss = torch.mean(-0.5 * torch.sum(-torch.exp(logvar) - mean**2 + 1. + logvar, dim=1), dim=0)
+    kl_loss = -0.5 * torch.sum(-torch.exp(logvar) - mean**2 + 1. + logvar)
     return recon_loss, kl_loss, recon_loss + kl_weight * kl_loss
 
 
@@ -196,10 +196,9 @@ class ModelTester():
                 for inputs, path in loader:
                     inputs = Variable(inputs).to(device, dtype=torch.float32)
                     output, z, logvar = self.model(inputs)
-                    target = torch.squeeze(inputs, dim=1).long()
-                    recon_loss_val, kl_val, loss_val = vae_loss(output, target, z, logvar, self.loss_func,
+                    #target = torch.squeeze(inputs, dim=1).long()
+                    recon_loss_val, kl_val, loss_val = vae_loss(inputs, output, z, logvar, self.loss_func,
                                      kl_weight=self.kl_weight)
-                    output = torch.argmax(output, dim=1)
 
                     for k in range(len(path)):
                         out_z = np.array(np.squeeze(z[k]).cpu().detach().numpy())

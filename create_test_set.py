@@ -42,6 +42,8 @@ import sys
 import pandas as pd
 import numpy as np
 import random
+from tqdm import tqdm
+from soma import aims
 from config import Config
 
 
@@ -52,25 +54,64 @@ train_list = pd.read_csv("/neurospin/dico/lguillon/hcp_info/right_handed_dataset
 train_list['subjects'] = train_list['subjects'].astype('str')
 print(f"total of right_handed subjects : {len(train_list)}")
 
-# subjects of HCP indeed processed with Morphologist
-hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
-                           columns=["subjects"])
-train_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
-print(f"total of right handed subjects processed with Morphologist : {len(train_list)}")
+# subjects of HCP processed
+hcp_sub = np.load(os.path.join(config.aug_dir,
+                                "Rdistmaps/sub_id.npy")).tolist()
+hcp_sub_df = pd.DataFrame(hcp_sub, columns=['subjects'])
+train_list = train_list.merge(hcp_sub_df,
+                              left_on='subjects',
+                              right_on='subjects')
+
+print("total of right handed subjects processed with Morphologist : "\
+      f"{len(train_list)}")
 
 # random selection of 200 subjects
 test_list = random.sample(list(train_list.subjects), 200)
 train_list = list(set(list(train_list.subjects))-set(test_list))
-benchmark_list = random.sample(train_list, 100)
-train_list = list(set(train_list)-set(benchmark_list))
+#benchmark_list = random.sample(train_list, 100)
+#train_list = list(set(train_list)-set(benchmark_list))
 print(f"total subjects for training : {len(train_list)}")
 print(f"total subjects for testing : {len(test_list)}")
-print(f"total subjects for testing : {len(benchmark_list)}")
+#print(f"total subjects for testing : {len(benchmark_list)}")
 
 # saving of subjects lists
-train_list = pd.DataFrame(train_list, columns=['subjects'])
-test_list = pd.DataFrame(test_list, columns=['subjects'])
-benchmark_list = pd.DataFrame(benchmark_list, columns=['subjects'])
-train_list.to_csv('/neurospin/dico/lguillon/miccai_22/data/train_list_2.csv')
-test_list.to_csv('/neurospin/dico/lguillon/miccai_22/data/test_list_2.csv')
-benchmark_list.to_csv('/neurospin/dico/lguillon/miccai_22/data/benchmark_list_2.csv')
+train_list_df = pd.DataFrame(train_list, columns=['subjects'])
+test_list_df = pd.DataFrame(test_list, columns=['subjects'])
+#benchmark_list = pd.DataFrame(benchmark_list, columns=['subjects'])
+train_list_df.to_csv('/neurospin/dico/lguillon/distmap/data/train_list.csv')
+test_list_df.to_csv('/neurospin/dico/lguillon/distmap/data/test_list.csv')
+#benchmark_list.to_csv('/neurospin/dico/lguillon/miccai_22/data/benchmark_list_2.csv')
+
+
+list_sample_id = []
+list_sample_file = []
+data_dir = '/neurospin/dico/data/deep_folding/current/datasets/hcp/crops/1mm/SC/no_mask/Rdistmaps'
+tgt_dir = '/neurospin/dico/lguillon/distmap/data'
+
+for sub in tqdm(train_list):
+    distmap = os.path.join(data_dir, f"{sub}_cropped_distmap.nii.gz")
+    vol = aims.read(distmap)
+    sample = np.asarray(vol)
+    list_sample_id.append(sub)
+    list_sample_file.append(sample)
+
+list_sample_id = np.array(list_sample_id)
+list_sample_file = np.array(list_sample_file)
+np.save(os.path.join(tgt_dir, 'train_sub_id.npy'), list_sample_id)
+np.save(os.path.join(tgt_dir, 'train_distmap.npy'), list_sample_file)
+print("train set saved !")
+
+list_sample_id = []
+list_sample_file = []
+for sub in tqdm(test_list):
+    distmap = os.path.join(data_dir, f"{sub}_cropped_distmap.nii.gz")
+    vol = aims.read(distmap)
+    sample = np.asarray(vol)
+    list_sample_id.append(sub)
+    list_sample_file.append(sample)
+
+list_sample_id = np.array(list_sample_id)
+list_sample_file = np.array(list_sample_file)
+np.save(os.path.join(tgt_dir, 'test_sub_id.npy'), list_sample_id)
+np.save(os.path.join(tgt_dir, 'test_distmap.npy'), list_sample_file)
+print("test set saved !")

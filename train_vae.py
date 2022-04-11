@@ -71,7 +71,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
     #weights = [1, config.weight]
     #class_weights = torch.FloatTensor(weights).to(device)
     #criterion = nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
-    criterion = nn.MSELoss(reduction='mean')
+    criterion = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(vae.parameters(), lr=lr)
 
     nb_epoch = config.nb_epoch
@@ -86,6 +86,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         running_loss = 0.0
         epoch_steps = 0
         for inputs, path in trainloader:
+            print(path)
+            print("==========================TRAIN==============")
             optimizer.zero_grad()
 
             inputs = Variable(inputs).to(device, dtype=torch.float32)
@@ -131,6 +133,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         total = 0
         vae.eval()
         for inputs, path in valloader:
+            print("==========================VAL==============")
             with torch.no_grad():
                 inputs = Variable(inputs).to(device, dtype=torch.float32)
                 output, z, logvar = vae(inputs)

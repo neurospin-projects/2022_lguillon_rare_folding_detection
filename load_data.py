@@ -41,6 +41,7 @@ import sys
 
 import pandas as pd
 import numpy as np
+import csv
 import random
 from preprocess import *
 from config import Config
@@ -57,36 +58,31 @@ def create_subset(config):
         subset: Dataset corresponding to HCP
     """
     ######## TO CHANGE ########
+    #df = pd.read_csv(config.subject_dir)
+    #train_list = np.array(list(df.subjects))
 
-    train_list = pd.read_csv(config.subject_dir)
-    train_list['subjects'] = train_list['subjects'].astype('str')
+    filenames = np.load(os.path.join(config.data_dir,
+                                    "train_sub_id.npy"))
+    distmaps = np.load(os.path.join(config.data_dir,
+                                    "train_distmap.npy"),
+                       mmap_mode='r')
 
-    #hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
-    #                       columns=["subjects"])
-    #train_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
+    #sorter = np.argsort(train_list)
+    #train_filenames = sorter[
+    #                    np.searchsorted(train_list, filenames, sorter=sorter)]
+    #train_distmaps = sorter[
+    #                    np.searchsorted(train_list, distmaps, sorter=sorter)]
 
-    distmaps = pd.read_pickle(os.path.join(config.data_dir, "Rdistmap.pkl")).T
-    distmaps.index.astype('str')
-
-    distmaps = distmaps.rename(columns={0: "distmaps"})
-
-    """foldlabels = pd.read_pickle(os.path.join(config.data_dir, "Rlabels.pkl")).T
-    foldlabels.index.astype('str')
-    foldlabels = foldlabels.rename(columns={0: "labels"})
-    foldlabels['subjects'] = foldlabels.index.astype('str')"""
-
-    distmaps = distmaps.merge(train_list, left_on = distmaps.index, right_on='subjects', how='right')
-    #foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
-
-    filenames = list(train_list['subjects'])
-
-    subset = SkeletonDataset(dataframe=distmaps, filenames=filenames,
-                             min_size=config.min_size, visu_check=False)
+    print(len(filenames), len(distmaps))
+    subset = SkeletonDataset(dataframe=distmaps,
+                             filenames=filenames,
+                             min_size=config.min_size,
+                             visu_check=False)
 
     return subset
 
 
-def create_benchmark_subset(config):
+def create_benchmark_subset(config, benchmark_dir):
     """
     Creates dataset from benchmark data: crops of precentral and postcentral
     sulci
@@ -98,45 +94,12 @@ def create_benchmark_subset(config):
         subset: Dataset corresponding to benchmark data
     """
     ######## TO CHANGE ########
-    benchmark_dir_1 = config.benchmark_dir_1
-    benchmark_dir_2 = config.benchmark_dir_2
-    #benchmark_list = pd.read_csv(config.benchmark_list)
-    train_list = pd.read_csv(config.subject_dir)
-    train_list['subjects'] = train_list['subjects'].astype('str')
+    distmaps = np.load(os.path.join(benchmark_dir, "distmap_1mm.npy"),
+                       mmap_mode='r')
 
-    #benchmark_list['subjects'] = benchmark_list['subjects'].astype('str')
-    hcp_sub = pd.DataFrame(os.listdir('/mnt/n4hhcp/hcp/ANALYSIS/3T_morphologist/'),
-                           columns=["subjects"])
+    filenames = np.load(os.path.join(config.data_dir, "train_sub_id.npy"))
 
-    benchmark_list = train_list.merge(hcp_sub, left_on='subjects', right_on='subjects')
-    #benchmark_list_2 = train_list[50:].merge(hcp_sub, left_on='subjects', right_on='subjects')
-
-    skeletons = pd.read_pickle(os.path.join(config.benchmark_dir_1, "Rskeleton.pkl")).T
-    skeletons.index.astype('str')
-
-    skeletons = skeletons.rename(columns={0: "skeleton"})
-
-    foldlabels = pd.read_pickle(os.path.join(config.data_dir, "Rlabels.pkl")).T
-    foldlabels.index.astype('str')
-    foldlabels = foldlabels.rename(columns={0: "labels"})
-    foldlabels['subjects'] = foldlabels.index.astype('str')
-
-    skeletons1 = skeletons.merge(benchmark_list[:int(len(benchmark_list)/2)], left_on = skeletons.index, right_on='subjects', how='right')
-    skeletons1.subjects.to_csv(f"{config.save_dir}precentral_sub_2.csv")
-
-    skeletons = pd.read_pickle(os.path.join(config.benchmark_dir_2, "Rskeleton.pkl")).T
-    skeletons.index.astype('str')
-    skeletons = skeletons.rename(columns={0: "skeleton"})
-
-    skeletons2 = skeletons.merge(benchmark_list[int(len(benchmark_list)/2):], left_on = skeletons.index, right_on='subjects', how='right')
-    skeletons2.subjects.to_csv(f"{config.save_dir}postcentral_sub_2.csv")
-
-    skeletons = pd.concat((skeletons1, skeletons2))
-    foldlabels = foldlabels.merge(skeletons, left_on = foldlabels.index, right_on='subjects', how='right')
-
-    filenames = list(benchmark_list['subjects'])
-
-    subset = SkeletonDataset(dataframe=foldlabels, filenames=filenames,
+    subset = SkeletonDatasetTest(dataframe=distmaps, filenames=filenames,
                              min_size=config.min_size, visu_check=False)
 
     return subset
@@ -189,9 +152,9 @@ def main():
     config = Config()
     #subset = create_subset(config)
 
-    benchmark = create_benchmark_subset(config)
+    benchmark = create_subset(config)
 
-    trainloader = torch.utils.data.DataLoader(
+    """trainloader = torch.utils.data.DataLoader(
                   benchmark,
                   batch_size=1,
                   num_workers=8,
@@ -213,7 +176,7 @@ def main():
     np.save(config.save_dir+'input.npy', np.array([input_arr]))
     #np.save(config.save_dir+'output.npy', np.array([output_arr]))
     #np.save(config.save_dir+'target.npy', np.array([target_arr]))
-    np.save(config.save_dir+'id.npy', np.array([id_arr]))
+    np.save(config.save_dir+'id.npy', np.array([id_arr]))"""
 
 
 if __name__ == '__main__':

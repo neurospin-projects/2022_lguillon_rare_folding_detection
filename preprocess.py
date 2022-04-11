@@ -76,58 +76,92 @@ class SkeletonDataset():
             idx = idx.tolist()
 
         if self.config.model == 'vae':
-            if self.filenames:
-                #filename = self.filenames[idx]
-                sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['distmaps']), axis=0)
-                filename = self.df.iloc[idx]['subjects']
+            if len(self.filenames)>0:
+                filename = self.filenames[idx]
+                idx = np.where(self.filenames==filename)
+                sample = self.df[idx]
 
             fill_value = 0
-            """self.transform = transforms.Compose([RotateTensor(filename), NormalizeSkeleton(),
-                                transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
-                                Padding(list(self.config.in_shape), fill_value=fill_value)
-                                   ])"""
             self.transform = transforms.Compose([RotateTensor(filename), NormalizeSkeleton(),
                                 Padding(list(self.config.in_shape), fill_value=fill_value)
                                    ])
-            """self.transform = transforms.Compose([NormalizeSkeleton(),
-                                Padding(list(self.config.in_shape), fill_value=fill_value)
-                                   ])"""
-            """self.transform = transforms.Compose([Padding(list(self.config.in_shape),
-                                                 fill_value=fill_value)
-                                                ])"""
+
             tuple_with_path = (self.transform(sample), filename)
-            #print(np.unique(tuple_with_path[0]))
-            #np.save(f"/neurospin/dico/lguillon/miccai_22/aug_{filename}.npy", tuple_with_path[0])
             return tuple_with_path
 
-        else:
-            if self.filenames:
-                #filename = self.filenames[idx]
-                sample = np.expand_dims(np.squeeze(self.df.iloc[idx]['skeleton']), axis=0)
-                filename = self.df.iloc[idx]['subjects']
-                labels = np.expand_dims(np.squeeze(self.df.iloc[idx]['labels']), axis=0)
+
+class SkeletonDatasetTest():
+    """Custom dataset for skeleton images that includes image file paths.
+
+    Args:
+        dataframe: dataframe containing training and testing arrays
+        filenames: optional, list of corresponding filenames
+
+    Returns:
+        tuple_with_path: tuple of type (sample, filename) with sample normalized
+                         and padded
+    """
+    def __init__(self, dataframe, filenames=None, min_size=100,
+                 visu_check=False):
+        torch.manual_seed(17)
+        self.df = dataframe
+        self.filenames = filenames
+        self.visu_check = visu_check
+        self.min_size = min_size
+        self.config = Config()
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        if self.config.model == 'vae':
+            if len(self.filenames)>0:
+                filename = self.filenames[idx]
+                idx = np.where(self.filenames==filename)
+                sample = self.df[idx]
+                sample = np.squeeze(sample)
 
             fill_value = 0
-            self.transform = transforms.Compose([randomSuppression(labels, self.min_size),
-                             NormalizeSkeleton(),
-                             Padding(list(self.config.in_shape), fill_value=fill_value)
-                             ])
-            transf_sample, target = self.transform(np.copy(sample))
-
-            padding = transforms.Compose([
-                     Padding(list(self.config.in_shape), fill_value=fill_value)])
-
-            tuple_with_path = (transf_sample, filename)
-
-            if self.visu_check:
-                self.transform_1 = transforms.Compose([NormalizeSkeleton(),
-                                   Padding(list(self.config.in_shape), fill_value=fill_value)
+            self.transform = transforms.Compose([NormalizeSkeleton(),
+                                Padding(list(self.config.in_shape), fill_value=fill_value)
                                    ])
-                orig_sample = self.transform_1(sample)
-                return tuple_with_path, padding(target), orig_sample
 
-            else:
-                return tuple_with_path, padding(target)
+            tuple_with_path = (self.transform(sample), filename)
+            return tuple_with_path
+
+
+"""class AugDatasetTransformer(torch.utils.data.Dataset):
+    def __init__(self, base_dataset, aug=True):
+        self.base_dataset = base_dataset
+        self.aug = aug
+        self.config = Config()
+
+    def __getitem__(self, index):
+        img, filename = self.base_dataset[index]
+        print(img.shape)
+        print(filename)
+        if self.aug:
+            print('rotation')
+            self.transform = transforms.Compose([
+                                RotateTensor(filename),
+                                NormalizeSkeleton(),
+                                Padding(list(self.config.in_shape),
+                                        fill_value=0)])
+        else:
+            print('no rotation')
+            self.transform = transforms.Compose([
+                                NormalizeSkeleton(),
+                                Padding(list(self.config.in_shape),
+                                        fill_value=0)])
+
+        tuple_with_path = (self.transform(img), filename)
+        return img, filename
+
+    def __len__(self):
+        return len(self.base_dataset)"""
 
 
 class RotateTensor(object):
@@ -142,35 +176,43 @@ class RotateTensor(object):
         self.max_angle = max_angle
 
         # Load intermediate bigger crop
-        sub_id = np.load(os.path.join(self.config.aug_dir, 'Rdistmaps/sub_id.npy'))
-        orig_file = np.load(os.path.join(self.config.aug_dir, "Rdistmaps/distmap_1mm.npy"), \
-                            mmap_mode='r')
-        idx = np.where(sub_id==filename)
-        self.orig_img = orig_file[idx]
+        ##sub_id = np.load(os.path.join(self.config.aug_dir, 'Rdistmaps/sub_id.npy'))
+        ##orig_file = np.load(os.path.join(self.config.aug_dir, "Rdistmaps/distmap_1mm.npy"), \
+        ##                    mmap_mode='r')
+        ##idx = np.where(sub_id==filename)
+        ##self.orig_img = orig_file[idx]
         #print(self.orig_img.shape)
-        vol_test = aims.Volume(self.orig_img)
-        aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
+        ##vol_test = aims.Volume(sample)
+        ##aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
 
         # Load cropped mask
         mask = aims.read(os.path.join(self.config.aug_dir,
-                                      'mask_distmap_cropped.nii.gz'))
+                                      'mask_cropped.nii.gz'))
         self.mask = np.asarray(mask)
         self.mask = np.squeeze(self.mask)
 
     def __call__(self, arr):
         #print('rotation')
         #arr = self.orig_img[0,:, :, :]
-        arr = np.squeeze(self.orig_img)
+        arr = np.squeeze(arr)
+        #no_rot = arr
+        #no_rot[self.mask==0] = 0
+        #vol_test = aims.Volume(no_rot)
+        #aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/NO_rot_test_{self.filename}.nii.gz")
+        ##arr = np.squeeze(self.orig_img)
         arr_shape = arr.shape
-        angle = np.random.uniform(-self.max_angle, self.max_angle)
-        #angle = 45
-        arr_rot = rotate(arr, angle, reshape=False)
+
+        for axis in [(0, 1), (0, 2), (1, 2)]:
+            angle = np.random.uniform(-self.max_angle, self.max_angle)
+            arr = rotate(arr, angle, axes=axis, reshape=False)
 
         #print(1, arr_rot.shape)
 
-        arr_rot[self.mask==0] = 0
+        arr[self.mask==0] = 0
+        #vol_test = aims.Volume(arr_rot)
+        #aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
         #print(2, arr_rot.shape)
-        arr_rot = np.expand_dims(arr_rot, axis=0)
+        arr = np.expand_dims(arr, axis=0)
         #print(3, arr_rot.shape)
 
         #vol = aims.Volume(np.expand_dims(np.squeeze(arr_rot), axis=3))
@@ -181,7 +223,7 @@ class RotateTensor(object):
         #print(3, np.asarray(arr_rot).shape)
 
         #return torch.from_numpy(np.asarray(arr_rot))
-        return torch.from_numpy(arr_rot)
+        return torch.from_numpy(arr)
 
 
 class RotateShiftTensor(object):
@@ -312,7 +354,7 @@ class NormalizeSkeleton(object):
         if self.nb_cls==2:
             arr[arr > 0] = 1
         elif self.distmap==True:
-            arr[arr!=0] = expit(arr[arr!=0])
+            arr[arr!=0] = 1 - (2 * expit(arr[arr!=0]) - 1)
             # arr[arr!=0] = np.tanh(arr[arr!=0])
 
         return arr
