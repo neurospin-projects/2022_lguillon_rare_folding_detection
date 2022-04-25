@@ -34,7 +34,7 @@
 # knowledge of the CeCILL license version 2 and that you accept its terms.
 
 """
-Tools in order to create pytorch dataloaders
+Tools in order to create test set
 """
 import os
 import sys
