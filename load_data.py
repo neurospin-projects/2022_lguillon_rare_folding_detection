@@ -47,7 +47,7 @@ from preprocess import *
 from config import Config
 
 
-def create_subset(config):
+def create_subset(config, mode):
     """
     Creates dataset from HCP data
 
@@ -60,32 +60,50 @@ def create_subset(config):
     ######## TO CHANGE ########
     #df = pd.read_csv(config.subject_dir)
     #train_list = np.array(list(df.subjects))
+    np.random.seed(1)
 
     filenames = np.load(os.path.join(config.data_dir,
                                     "train_sub_id.npy"))
     distmaps = np.load(os.path.join(config.data_dir,
                                     "train_distmap.npy"),
                        mmap_mode='r')
-
+    #filenames = filenames[:200]
+    #distmaps = distmaps[:200]
+    #print(distmaps.shape)
     #sorter = np.argsort(train_list)
     #train_filenames = sorter[
     #                    np.searchsorted(train_list, filenames, sorter=sorter)]
     #train_distmaps = sorter[
     #                    np.searchsorted(train_list, distmaps, sorter=sorter)]
+    indices = list(range(len(filenames)))
+    np.random.shuffle(indices)
+    split = int(np.floor(0.8 * len(filenames)))
+    train_idx, val_idx = indices[:split], indices[split:]
+    train_distmap, train_filenames = distmaps[train_idx], filenames[train_idx]
+    val_distmap, val_filenames = distmaps[val_idx], filenames[val_idx]
 
-    print(len(filenames), len(distmaps))
-    subset = SkeletonDataset(dataframe=distmaps,
-                             filenames=filenames,
-                             min_size=config.min_size,
-                             visu_check=False)
+    if mode=='train':
+        train_set = SkeletonDataset(dataframe=train_distmap,
+                                    filenames=train_filenames,
+                                    data_transforms=True)
+        val_set = SkeletonDataset(dataframe=val_distmap,
+                                  filenames=val_filenames,
+                                  data_transforms=False)
+        return train_set, val_set
 
-    return subset
+    else:
+        train_set = SkeletonDataset(dataframe=train_distmap,
+                                    filenames=train_filenames,
+                                    data_transforms=False)
+
+        return train_set
 
 
-def create_benchmark_subset(config, benchmark_dir):
+def create_benchmark_subset(config, benchmark_dir, gridsearch=False,
+                            bench=False):
     """
-    Creates dataset from benchmark data: crops of precentral and postcentral
-    sulci
+    Creates dataset from benchmark data to identify ambiguous subjects
+    Benchmark is composed of crops of precentral and postcentral sulci
 
     Args:
         config: instance of class Config
@@ -93,14 +111,31 @@ def create_benchmark_subset(config, benchmark_dir):
     Returns:
         subset: Dataset corresponding to benchmark data
     """
-    ######## TO CHANGE ########
+    if gridsearch:
+        if bench=='pre':
+            df = pd.read_csv("/neurospin/dico/lguillon/distmap/" \
+                             "pre_post_ambiguity_search/subject_pre.csv")
+        elif bench=='post':
+            df = pd.read_csv("/neurospin/dico/lguillon/distmap/" \
+                             "pre_post_ambiguity_search/subject_post.csv")
+    else:
+        df = pd.read_csv(config.subject_dir)
+
+    train_list = np.array(list(df.subjects))
     distmaps = np.load(os.path.join(benchmark_dir, "distmap_1mm.npy"),
                        mmap_mode='r')
-
     filenames = np.load(os.path.join(config.data_dir, "train_sub_id.npy"))
 
-    subset = SkeletonDatasetTest(dataframe=distmaps, filenames=filenames,
-                             min_size=config.min_size, visu_check=False)
+    sorter = np.argsort(filenames)
+    filenames_idx = sorter[np.searchsorted(filenames, train_list, sorter=sorter)]
+    filenames = filenames[filenames_idx]
+    distmaps = distmaps[filenames_idx]
+
+    print(distmaps.shape, filenames.shape)
+
+    subset = SkeletonDataset(dataframe=distmaps,
+                             filenames=filenames,
+                             data_transforms=False)
 
     return subset
 
