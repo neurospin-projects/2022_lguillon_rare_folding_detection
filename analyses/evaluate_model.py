@@ -32,6 +32,27 @@
 #
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license version 2 and that you accept its terms.
+import os
+import sys
+
+p = os.path.abspath('../')
+if p not in sys.path:
+    sys.path.append(p)
+
+import numpy as np
+import pandas as pd
+import json
+import itertools
+import torch
+from sklearn.model_selection import KFold
+from torch.utils.tensorboard import SummaryWriter
+
+from vae import ModelTester
+#from preprocess import AugDatasetTransformer
+from train_vae import train_vae
+#from analyses.evaluate_model import anomaly_score, classifier
+from load_data import create_subset, create_benchmark_subset
+from config import Config
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -101,3 +122,80 @@ def classifier(X_val, sub_train, X_benchmark, sub_bench):
     logreg, svm, gb = np.mean(av_log), np.mean(av_svm), np.mean(av_gb)
     print(logreg, svm, gb)
     return logreg, svm, gb, subjects_dict
+
+
+def main():
+    root_dir = f"/neurospin/dico/lguillon/distmap/"
+    torch.manual_seed(0)
+    if torch.cuda.is_available():
+        device = "cuda:0"
+        if torch.cuda.device_count() > 1:
+            vae = nn.DataParallel(vae)
+
+    """ Evaluate model performances """
+    #dico_set_loaders = {'ctrl': control_loader, 'amputee': amputee_loader, 'congenital': congenital_loader}
+    train_set = create_subset(config, mode='evaluate')
+    trainloader = torch.utils.data.DataLoader(
+                                              train_set,
+                                              batch_size=config.batch_size,
+                                              num_workers=8,
+                                              shuffle=True)
+    benchmark_pre = create_benchmark_subset(config, config.benchmark_dir_1)
+    benchmark_post = create_benchmark_subset(config, config.benchmark_dir_2)
+    benchloader_pre = torch.utils.data.DataLoader(
+                      benchmark_pre,
+                      batch_size=config.batch_size,
+                      num_workers=8,
+                      shuffle=False)
+    benchloader_post = torch.utils.data.DataLoader(
+                       benchmark_post,
+                       batch_size=config.batch_size,
+                       num_workers=8,
+                       shuffle=False)
+    dico_set_loaders = {'train': trainloader,
+                        'benchmark_pre': benchloader_pre,
+                        'benchloader_post': benchloader_post}
+
+    print(len(trainloader), len(benchloader_pre), len(benchloader_post))
+
+    tester = ModelTester(model=vae, dico_set_loaders=dico_set_loaders,
+                         kl_weight=kl, loss_func=criterion, n_latent=n,
+                         depth=3)
+
+    results = tester.test()
+    encoded = {loader_name:[results[loader_name][k][1] for k in results[loader_name].keys()] for loader_name in dico_set_loaders.keys()}
+    losses = {loader_name:[int(results[loader_name][k][0].cpu().detach().numpy()) for k in results[loader_name].keys()] for loader_name in dico_set_loaders.keys()}
+
+    X_train = np.array(list(encoded['train']))
+    sub_train = np.array(list(results['train'].keys()))
+
+    """Precentral sulcus"""
+    X_benchmark_pre = np.array(list(encoded['benchmark_pre']))
+    sub_bench_pre = np.array(list(results['benchmark_pre'].keys()))
+
+    res_clf = classifier(X_train, sub_train, X_benchmark_pre, sub_bench_pre)
+
+    res['final_loss_val'] = final_loss_val
+    res['logreg_pre'] = res_clf[0]
+    res['svm_pre'] = res_clf[1]
+    res['gb_pre'] = res_clf[2]
+    print(res_clf[3])
+    res['sub_problem_pre'] = res_clf[3]
+
+    """Postcentral sulcus"""
+    X_benchmark_post = np.array(list(encoded['benchloader_post']))
+    sub_bench_post = np.array(list(results['benchloader_post'].keys()))
+    res_clf = classifier(X_train, sub_train, X_benchmark_post, sub_bench_post)
+
+    print('end of config')
+    res['logreg_post'] = res_clf[0]
+    res['svm_post'] = res_clf[1]
+    res['gb_post'] = res_clf[2]
+    print(res_clf[3])
+    res['sub_problem_post'] = res_clf[3]
+
+    with open(f"{root_dir}results_test.json", "w") as json_file:
+        json_file.write(json.dumps(res, sort_keys=True, indent=4))
+
+if __name__ == '__main__':
+    main()
