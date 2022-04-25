@@ -66,9 +66,9 @@ if __name__ == '__main__':
     # if config.model == 'vae':
     #     subset1 = create_vae_subset(config)
     # else:
-    subset1 = create_subset(config)
-    train_set, val_set = torch.utils.data.random_split(subset1,
-                            [round(0.8*len(subset1)), round(0.2*len(subset1))])
+    train_set, val_set = create_subset(config, mode='train')
+    #train_set, val_set = torch.utils.data.random_split(subset1,
+    #                        [round(0.8*len(subset1)), round(0.2*len(subset1))])
     trainloader = torch.utils.data.DataLoader(
                   train_set,
                   batch_size=8,
