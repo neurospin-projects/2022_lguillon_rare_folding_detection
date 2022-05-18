@@ -73,7 +73,7 @@ def main():
     """
     root_dir = "/neurospin/dico/lguillon/distmap/pre_post_ambiguity_search/"
     bck_dir = "/neurospin/dico/data/deep_folding/current/datasets/hcp/crops/1mm/postcentral/no_mask/benchmark/Rbuckets/"
-    #bck_dir = "/neurospin/dico/data/deep_folding/current/datasets/hcp/crops/1mm/SC/no_mask/Rbuckets/"
+    bck_dir = "/neurospin/dico/data/deep_folding/current/datasets/hcp/crops/1mm/SC/no_mask/Rbuckets/"
 
     #sub_dir = f"{root_dir}results_test.json"
     sub_dir = f"{root_dir}post_ambiguity.json"
@@ -81,10 +81,15 @@ def main():
         data = json.load(f)
     #sub_list = list(data['sub_problem_pre'].keys())
     sub_list = list(data.keys())
+    sub_list = [887373, 704238, 679770, 124422, 872158, 942658, 168038, 802844,
+       116221, 100206, 172534, 329440, 180937, 965367, 351938, 185038,
+       145632, 199958, 121416, 731140, 135730, 104012, 117122, 176239,
+       123824, 275645, 189450, 167440, 891667, 139839, 120010, 510326,
+       456346, 573249, 175035, 211720]
     n_sub = len(sub_list)
 
     a = anatomist.Anatomist()
-    block = a.AWindowsBlock(a, 6)  # Parameter 6 corresponds to the number of columns displayed. Can be changed.
+    block = a.AWindowsBlock(a, 12)  # Parameter 6 corresponds to the number of columns displayed. Can be changed.
 
     for k in range(n_sub):
         sub_id = sub_list[k]

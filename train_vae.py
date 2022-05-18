@@ -35,7 +35,7 @@
 
 import numpy as np
 import pandas as pd
-from torchsummary import summary
+#from torchsummary import summary
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
@@ -57,7 +57,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         final_loss_val
     """
     torch.manual_seed(0)
-    writer = SummaryWriter(comment=f"n_{config.n}_kl_{config.kl}")
+    writer = SummaryWriter(comment=f"rotation_-3_3_{config.n}_kl_{config.kl}")
     lr = config.lr
     #vae = VAE(config.in_shape, curr_config['n'], depth=3)
     print(config.in_shape, config.n)
@@ -66,11 +66,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
     if torch.cuda.is_available():
         device = "cuda:0"
     vae.to(device)
-    summary(vae, config.in_shape)
+    #summary(vae, config.in_shape)
 
-    #weights = [1, config.weight]
-    #class_weights = torch.FloatTensor(weights).to(device)
-    #criterion = nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
     criterion = nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(vae.parameters(), lr=lr)
 
@@ -86,8 +83,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         running_loss = 0.0
         epoch_steps = 0
         for inputs, path in trainloader:
-            print(path)
-            print("==========================TRAIN==============")
+            #print(path)
+            #print("==========================TRAIN==============")
             optimizer.zero_grad()
 
             inputs = Variable(inputs).to(device, dtype=torch.float32)
@@ -112,7 +109,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         grid = torchvision.utils.make_grid(images)
         writer.add_image('inputs', images[0].unsqueeze(0), epoch)
         writer.add_image('output', images[1].unsqueeze(0), epoch)
-        writer.add_scalar('Loss/train', running_loss, epoch)
+        writer.add_scalar('Loss/train', running_loss / epoch_steps, epoch)
         writer.close()
         print("[%d] loss: %.3f" % (epoch + 1,
                                         running_loss / epoch_steps))
@@ -133,7 +130,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         total = 0
         vae.eval()
         for inputs, path in valloader:
-            print("==========================VAL==============")
+            #print("==========================VAL==============")
             with torch.no_grad():
                 inputs = Variable(inputs).to(device, dtype=torch.float32)
                 output, z, logvar = vae(inputs)
@@ -146,7 +143,12 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
                 val_loss += loss.cpu().numpy()
                 val_steps += 1
         valid_loss = val_loss / val_steps
+        images = [inputs[0][0][20][:][:],\
+                  output[0][0][20][:][:]]
         writer.add_scalar('Loss/val', valid_loss, epoch)
+        writer.add_image('inputs VAL', images[0].unsqueeze(0), epoch)
+        writer.add_image('output VAL', images[1].unsqueeze(0), epoch)
+
         writer.close()
         print("[%d] validation loss: %.3f" % (epoch + 1, valid_loss))
         list_loss_val.append(valid_loss)
@@ -173,8 +175,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
     final_loss_val = list_loss_val[-1:]
 
     """Saving of trained model"""
-    #torch.save((vae.state_dict(), optimizer.state_dict()),
-    #            config.save_dir + 'vae.pt')
+    torch.save((vae.state_dict(), optimizer.state_dict()),
+                config.save_dir + 'vae.pt')
 
     print("Finished Training")
     return vae, final_loss_val

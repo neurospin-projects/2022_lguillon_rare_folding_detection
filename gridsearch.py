@@ -94,7 +94,7 @@ def gridsearch_bVAE_sub1():
     for kl, n in list(itertools.product(grid_config["kl"], grid_config["n"])):
         cur_config = {"kl": kl, "n": n}
         config.kl, config.n = kl, n
-        root_dir = f"/neurospin/dico/lguillon/distmap/gridsearch/n_{n}_kl_{kl}/"
+        root_dir = f"/neurospin/dico/lguillon/distmap/gridsearch_lr5e-4/n_{n}_kl_{kl}/"
         #root_dir = config.save_dir
         res = {}
 

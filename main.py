@@ -44,7 +44,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 #from model import ModelTester
-from train import train_model
+#from train import train_model
 from train_vae import train_vae
 #from clustering import Cluster
 from load_data import create_subset

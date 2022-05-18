@@ -194,6 +194,7 @@ class ModelTester():
             self.model.eval()
             with torch.no_grad():
                 for inputs, path in loader:
+                    print(np.unique(inputs))
                     inputs = Variable(inputs).to(device, dtype=torch.float32)
                     output, z, logvar = self.model(inputs)
                     #target = torch.squeeze(inputs, dim=1).long()
@@ -202,7 +203,7 @@ class ModelTester():
 
                     for k in range(len(path)):
                         out_z = np.array(np.squeeze(z[k]).cpu().detach().numpy())
-
-                        results[loader_name][path[k]] = loss_val, out_z
+                        #results[loader_name][path[k]] = loss_val, out_z, recon_loss_val
+                        results[loader_name][path[k]] = loss_val, out_z, recon_loss_val, inputs
 
         return results
