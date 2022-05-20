@@ -57,7 +57,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         final_loss_val
     """
     torch.manual_seed(0)
-    writer = SummaryWriter(comment=f"rotation_-3_3_{config.n}_kl_{config.kl}")
+    writer = SummaryWriter(comment=f"inpainting_{config.n}_kl_{config.kl}")
     lr = config.lr
     #vae = VAE(config.in_shape, curr_config['n'], depth=3)
     print(config.in_shape, config.n)
@@ -82,18 +82,18 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
     for epoch in range(config.nb_epoch):
         running_loss = 0.0
         epoch_steps = 0
-        for inputs, path in trainloader:
-            #print(path)
+        for distmap_masked, distmap, path in trainloader:
             #print("==========================TRAIN==============")
             optimizer.zero_grad()
 
-            inputs = Variable(inputs).to(device, dtype=torch.float32)
+            inputs = Variable(distmap_masked).to(device, dtype=torch.float32)
+            distmap = Variable(distmap).to(device, dtype=torch.float32)
             #target = torch.squeeze(inputs, dim=1).long()
             output, z, logvar = vae(inputs)
             """recon_loss, kl, loss = vae_loss(output, target, z,
                                     logvar, criterion,
                                     kl_weight=config.kl)"""
-            recon_loss, kl, loss = vae_loss(inputs, output, z,
+            recon_loss, kl, loss = vae_loss(distmap, output, z,
                                     logvar, criterion,
                                     kl_weight=config.kl)
             #output = torch.argmax(output, dim=1)
@@ -105,10 +105,12 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         # addition of one reconstruction in visualization
         #print(inputs.shape, output.shape)
         images = [inputs[0][0][20][:][:],\
+                  distmap[0][0][20][:][:],\
                   output[0][0][20][:][:]]
         grid = torchvision.utils.make_grid(images)
         writer.add_image('inputs', images[0].unsqueeze(0), epoch)
-        writer.add_image('output', images[1].unsqueeze(0), epoch)
+        writer.add_image('target', images[1].unsqueeze(0), epoch)
+        writer.add_image('output', images[2].unsqueeze(0), epoch)
         writer.add_scalar('Loss/train', running_loss / epoch_steps, epoch)
         writer.close()
         print("[%d] loss: %.3f" % (epoch + 1,
@@ -129,13 +131,14 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         val_steps = 0
         total = 0
         vae.eval()
-        for inputs, path in valloader:
+        for distmap_masked, distmap, path in valloader:
             #print("==========================VAL==============")
             with torch.no_grad():
-                inputs = Variable(inputs).to(device, dtype=torch.float32)
+                inputs = Variable(distmap_masked).to(device, dtype=torch.float32)
+                distmap = Variable(distmap).to(device, dtype=torch.float32)
                 output, z, logvar = vae(inputs)
                 #target = torch.squeeze(inputs, dim=1).long()
-                recon_loss_val, kl_val, loss = vae_loss(inputs, output,
+                recon_loss_val, kl_val, loss = vae_loss(distmap, output,
                                         z, logvar, criterion,
                                         kl_weight=config.kl)
                 #output = torch.argmax(output, dim=1)

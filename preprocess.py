@@ -38,11 +38,12 @@ import os
 import numpy as np
 import pandas as pd
 import random
+import tempfile
 import torch
 import torchvision.transforms as transforms
 from scipy.ndimage import rotate, find_objects, shift
 from scipy.special import expit
-from soma import aims
+from soma import aims, aimsalgo
 
 import deep_folding as df
 from config import Config
@@ -102,6 +103,101 @@ class SkeletonDataset():
             return tuple_with_path
 
 
+class InpaintDataset():
+    """Custom dataset for skeleton images that includes image file paths.
+
+    Args:
+        dataframe: dataframe containing training and testing arrays
+        filenames: optional, list of corresponding filenames
+
+    Returns:
+        tuple_with_path: tuple of type (sample, filename) with sample normalized
+                         and padded
+    """
+    def __init__(self, foldlabels, skeletons, distmaps, filenames, data_transforms):
+        torch.manual_seed(17)
+        print('inpaint')
+        self.foldlabel = foldlabels
+        self.skeletons = skeletons
+        self.distmaps = distmaps
+        self.filenames = filenames
+        self.data_transforms = data_transforms
+        self.config = Config()
+
+    def __len__(self):
+        return len(self.distmaps)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        if self.config.model == 'vae':
+            if len(self.filenames)>0:
+                filename = self.filenames[idx]
+                idx_foldlabel = np.where(self.filenames==filename)
+                foldlabel = self.foldlabel[idx]
+                skeleton = self.skeletons[idx]
+                distmap = self.distmaps[idx]
+
+                angle = np.random.uniform(-10, 10)
+
+            fill_value = 0
+            a = transforms.Compose([ApplyMask()])
+            foldlabel = a(foldlabel)
+            b = transforms.Compose([randomSuppression(foldlabel)])
+            skeleton, target = b(skeleton)
+            distmap_masked = convert2Distmap(skeleton)
+            if self.data_transforms:
+                self.transform = transforms.Compose([
+                                        RotateTensor(filename, angle),
+                                        ApplyMask(),
+                                        NormalizeSkeleton(),
+                                        Padding(list(self.config.in_shape),
+                                                fill_value=fill_value)
+                                        ])
+            else:
+                self.transform = transforms.Compose([
+                                        NormalizeSkeleton(),
+                                        ApplyMask(),
+                                        Padding(list(self.config.in_shape),
+                                                fill_value=fill_value)
+                                        ])
+            distmap_masked = np.squeeze(distmap_masked)
+            distmap = np.squeeze(distmap)
+            #target = np.squeeze(target)
+
+            tuple_with_path = (self.transform(distmap_masked),
+                               self.transform(distmap),
+                               filename)
+            # tuple_with_path = (self.transform(distmap_masked),
+            #                    self.transform(target),
+            #                    filename)
+            # dist_vol = aims.Volume(distmap)
+            # distM_vol = aims.Volume(distmap_masked)
+            # aims.write(dist_vol, '/tmp/distvol.nii.gz')
+            # aims.write(distM_vol, '/tmp/distvolM.nii.gz')
+            return tuple_with_path
+
+def convert2Distmap(skeleton):
+    """
+    """
+    temp_dir = tempfile.mkdtemp()
+    temp_file_skel = f"{temp_dir}/skel.nii.gz"
+
+    vol_skel = aims.Volume(skeleton)
+    aims.write(vol_skel, temp_file_skel)
+    temp_file_distmap = f"{temp_dir}/distmap.nii.gz"
+    cmd_distMap = 'AimsChamferDistanceMap' + \
+    ' -i ' + temp_file_skel + \
+    ' -o ' + temp_file_distmap + \
+    ' -s OUTSIDE'
+    os.system(cmd_distMap)
+    vol_distmap = aims.read(temp_file_distmap)
+    distmap = np.asarray(vol_distmap)
+
+    return distmap
+
+
 class ApplyMask(object):
     """Apply specific sulcus mask
     """
@@ -123,148 +219,56 @@ class RotateTensor(object):
     """Apply a random rotation on the images
     """
 
-    def __init__(self, filename, max_angle=10):
+    def __init__(self, filename, angle, max_angle=10):
         torch.manual_seed(17)
         self.config = Config()
         self.filename = filename
         self.max_angle = max_angle
-
-        # Load cropped mask
-        # mask = aims.read(os.path.join(self.config.aug_dir,
-        #                               'mask_cropped.nii.gz'))
-        # self.mask = np.asarray(mask)
-        # self.mask = np.squeeze(self.mask)
+        self.angle = angle
 
     def __call__(self, arr):
-        #no_rot = arr
-        #no_rot[self.mask==0] = 0
-        #vol_test = aims.Volume(no_rot)
-        #aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/NO_rot_test_{self.filename}.nii.gz")
         arr_shape = arr.shape
 
         for axis in [(0, 1), (0, 2), (1, 2)]:
-            angle = np.random.uniform(-self.max_angle, self.max_angle)
-            arr = rotate(arr, angle, axes=axis, reshape=False)
-
-        ##arr[self.mask==0] = 0
-        #vol_test = aims.Volume(arr_rot)
-        #aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
-        ##arr = np.expand_dims(arr, axis=0)
+            #angle = np.random.uniform(-self.max_angle, self.max_angle)
+            #arr = rotate(arr, angle, axes=axis, reshape=False)
+            arr = rotate(arr, self.angle, axes=axis, reshape=False)
 
         return torch.from_numpy(arr)
-
-
-class RotateShiftTensor(object):
-    """Apply a random rotation on the images
-    """
-
-    def __init__(self, filename, max_angle=45):
-        torch.manual_seed(17)
-        self.config = Config()
-        self.filename = filename
-
-        self.max_angle = max_angle
-
-        # Load intermediate bigger crop
-        sub_id = np.load(os.path.join(self.config.aug_dir, 'Rdistmaps/sub_id.npy'))
-        orig_file = np.load(os.path.join(self.config.aug_dir, "Rdistmaps/distmap_1mm.npy"), \
-                            mmap_mode='r')
-        idx = np.where(sub_id==filename)
-        self.orig_img = orig_file[idx]
-        #print(self.orig_img.shape)
-        vol_test = aims.Volume(self.orig_img)
-        aims.write(vol_test, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
-
-        # Load cropped mask
-        mask = aims.read(os.path.join(self.config.aug_dir,
-                                      'mask_distmap_cropped.nii.gz'))
-        self.mask = np.asarray(mask)
-        self.mask = np.squeeze(self.mask)
-
-    def __call__(self, arr):
-        #print('rotation')
-        #arr = self.orig_img[0,:, :, :]
-        arr = np.squeeze(self.orig_img)
-        arr_shape = arr.shape
-        angle = np.random.uniform(-self.max_angle, self.max_angle)
-        #angle = 45
-        arr_rot = rotate(arr, angle, reshape=False)
-        arr_rot = shift(arr_rot, 5)
-
-        #print(1, arr_rot.shape)
-
-        arr_rot[self.mask==0] = 0
-        #print(2, arr_rot.shape)
-        arr_rot = np.expand_dims(arr_rot, axis=0)
-        #print(3, arr_rot.shape)
-
-        #vol = aims.Volume(np.expand_dims(np.squeeze(arr_rot), axis=3))
-        #arr_rot = aims.VolumeView(vol, self.bbmin, self.bbmax-self.bbmin)
-        #print(self.bbmin, self.bbmax-self.bbmin)
-        #np.save(f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.npy", arr_rot)
-        #aims.write(vol, f"/neurospin/dico/lguillon/distmap/rot_test_{self.filename}.nii.gz")
-        #print(3, np.asarray(arr_rot).shape)
-
-        #return torch.from_numpy(np.asarray(arr_rot))
-        return torch.from_numpy(arr_rot)
 
 
 class randomSuppression(object):
     """
     """
-    def __init__(self, foldlabel_map, min_size=100):
-        #self.sample = sample
-        self.foldlabel_map = foldlabel_map
+    def __init__(self, foldlabel, min_size=100):
+        self.foldlabel = np.squeeze(foldlabel, axis=0)
         self.min_size = min_size
 
     def random_choice(self):
-        self.del_list = []
-        total_del = 0
-        folds_list = np.unique(self.foldlabel_map, return_counts=True)
-        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1])}
-
+        folds_list = np.unique(self.foldlabel, return_counts=True)
+        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>100}
         # We don't take into account the background in the random choice of fold
         folds_dico.pop(0, None)
 
         # Random choice of fold
-        fold = random.choice(list(folds_dico.keys()))
-        #print(folds_dico[fold])
+        self.fold = random.choice(list(folds_dico.keys()))
 
-        # if fold size < 100, deletion of other folds
-        if folds_dico[fold]<self.min_size:
-            if folds_dico[fold]>5 :
-                total_del = folds_dico[fold]
-                self.del_list.append(fold)
-                folds_dico.pop(fold, None)
-            while total_del <= self.min_size:
-                fold = random.choice([k for k, v in folds_dico.items() if v>5])
-                total_del += folds_dico[fold]
-                self.del_list.append(fold)
-                folds_dico.pop(fold, None)
-
-        # if fold size >= 100, suppression of this fold only
-        else:
-            self.del_list.append(fold)
-
-    def __call__(self, sample):
-        target = np.zeros(list(sample.shape))
-        assert(target.shape==sample.shape)
+    def __call__(self, skeleton):
+        target = np.zeros(list(skeleton.shape))
+        assert(target.shape==skeleton.shape)
 
         self.random_choice()
-
-        for fold in self.del_list:
-            self.foldlabel_map[self.foldlabel_map==fold] = 9999
+        self.foldlabel[self.foldlabel==self.fold] = 9999
 
         ## suppression of chosen folds
-        old = np.unique(sample, return_counts=True)
-        sample[self.foldlabel_map==9999] = 0
-        new = np.unique(sample, return_counts=True)
-        assert(new[1][0]-old[1][0]>=self.min_size-50)
+        skeleton[self.foldlabel==9999] = -1
+        assert(np.count_nonzero(skeleton==-1)>=100)
+        skeleton[skeleton==-1] = 0
 
         ## writing of deleted folds to reconstruct in target
-        target[self.foldlabel_map==9999] = 1
+        target[self.foldlabel==9999] = 1
 
-        return sample, target
+        return skeleton, target
 
 
 class NormalizeSkeleton(object):

@@ -47,7 +47,7 @@ from torch.utils.tensorboard import SummaryWriter
 #from train import train_model
 from train_vae import train_vae
 #from clustering import Cluster
-from load_data import create_subset
+from load_data import create_subset, create_inpaint_subset
 from config import Config
 
 
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # if config.model == 'vae':
     #     subset1 = create_vae_subset(config)
     # else:
-    train_set, val_set = create_subset(config, mode='train')
+    train_set, val_set = create_inpaint_subset(config, mode='train')
     #train_set, val_set = torch.utils.data.random_split(subset1,
     #                        [round(0.8*len(subset1)), round(0.2*len(subset1))])
     trainloader = torch.utils.data.DataLoader(

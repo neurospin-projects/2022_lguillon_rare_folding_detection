@@ -57,9 +57,6 @@ def create_subset(config, mode):
     Returns:
         subset: Dataset corresponding to HCP
     """
-    ######## TO CHANGE ########
-    #df = pd.read_csv(config.subject_dir)
-    #train_list = np.array(list(df.subjects))
     np.random.seed(1)
 
     filenames = np.load(os.path.join(config.data_dir,
@@ -67,14 +64,7 @@ def create_subset(config, mode):
     distmaps = np.load(os.path.join(config.data_dir,
                                     "train_distmap.npy"),
                        mmap_mode='r')
-    #filenames = filenames[:200]
-    #distmaps = distmaps[:200]
-    #print(distmaps.shape)
-    #sorter = np.argsort(train_list)
-    #train_filenames = sorter[
-    #                    np.searchsorted(train_list, filenames, sorter=sorter)]
-    #train_distmaps = sorter[
-    #                    np.searchsorted(train_list, distmaps, sorter=sorter)]
+
     indices = list(range(len(filenames)))
     np.random.shuffle(indices)
     split = int(np.floor(0.8 * len(filenames)))
@@ -96,6 +86,82 @@ def create_subset(config, mode):
                                     filenames=train_filenames,
                                     data_transforms=False)
 
+        return train_set
+
+
+def create_inpaint_subset(config, mode='train'):
+    """
+    Creates dataset from HCP data for inpainting model
+
+    Args:
+        config: instance of class Config
+
+    Returns:
+        subset: Dataset corresponding to HCP
+    """
+    np.random.seed(1)
+    print('ici')
+
+    filenames_ref = np.load(os.path.join(config.train_idx_dir,
+                                    "train_sub_id.npy"))
+
+    distmaps = np.load(os.path.join(config.data_dir, "Rskel_distmaps",
+                                    "skel_distmap_1mm.npy"),
+                       mmap_mode='c')
+
+    skeletons = np.load(os.path.join(config.data_dir, "Rskeletons",
+                                    "skeletons_1mm.npy"),
+                       mmap_mode='c')
+    filenames = np.load(os.path.join(config.data_dir,"Rfoldlabels",
+                                    "sub_id.npy"))
+    foldlabels = np.load(os.path.join(config.data_dir, "Rfoldlabels",
+                                    "foldlabels_1mm.npy"),
+                       mmap_mode='c')
+    sorter = np.argsort(filenames)
+    filenames_idx = sorter[np.searchsorted(filenames, filenames_ref, sorter=sorter)]
+    filenames = filenames[filenames_idx]
+    distmaps = distmaps[filenames_idx]
+    skeletons = skeletons[filenames_idx]
+    foldlabels = foldlabels[filenames_idx]
+
+    indices = list(range(len(filenames_ref)))
+    np.random.shuffle(indices)
+    split = int(np.floor(0.8 * len(filenames)))
+    train_idx, val_idx = indices[:split], indices[split:]
+
+    train_distmaps, train_filenames = distmaps[train_idx], filenames[train_idx]
+    train_skeletons, train_foldlabels = skeletons[train_idx], foldlabels[train_idx]
+    val_distmaps, val_filenames = distmaps[val_idx], filenames[val_idx]
+    val_skeletons, val_foldlabels = skeletons[val_idx], foldlabels[val_idx]
+
+    #data = np.array([foldlabels, skeletons, distmaps])
+
+    # indices = list(range(len(filenames)))
+    # np.random.shuffle(indices)
+    # split = int(np.floor(0.8 * len(filenames)))
+    # train_idx, val_idx = indices[:split], indices[split:]
+    # train_distmap, train_filenames = distmaps[train_idx], filenames[train_idx]
+    # val_distmap, val_filenames = distmaps[val_idx], filenames[val_idx]
+
+    if mode=='train':
+        train_set = InpaintDataset(foldlabels=train_foldlabels,
+                                    skeletons = train_skeletons,
+                                    distmaps = train_distmaps,
+                                    filenames=train_filenames,
+                                    data_transforms=True)
+        val_set = InpaintDataset(foldlabels=val_foldlabels,
+                                 skeletons = val_skeletons,
+                                 distmaps = val_distmaps,
+                                 filenames=val_filenames,
+                                  data_transforms=False)
+        return train_set, val_set
+
+    else:
+        train_set = InpaintDataset(foldlabels=foldlabels,
+                                    filenames=filenames,
+                                    skeletons = skeletons,
+                                    distmaps = distmaps,
+                                    data_transforms=False)
         return train_set
 
 
@@ -187,28 +253,28 @@ def main():
     config = Config()
     #subset = create_subset(config)
 
-    benchmark = create_subset(config)
+    train, val = create_inpaint_subset(config)
+    print('ok !')
 
-    """trainloader = torch.utils.data.DataLoader(
-                  benchmark,
+    trainloader = torch.utils.data.DataLoader(
+                  train,
                   batch_size=1,
-                  num_workers=8,
+                  num_workers=1,
                   shuffle=False)
     input_arr = []
     output_arr = []
     target_arr = []
     id_arr = []
-    for sample, path in trainloader:
+    for distmap_masked, distmap, path in trainloader:
         print(path)
-        print(np.unique(sample))
-        print(sample.shape)
-        for k in range(len(path)):
-            input_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
+        print(distmap_masked.shape)
+        #for k in range(len(path)):
+            #input_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
             #output_arr.append(np.array(np.squeeze(sample[k]).cpu().detach().numpy()))
             #target_arr.append(np.array(np.squeeze(target[k]).cpu().detach().numpy()))
-            id_arr.append(path[k])
+            #id_arr.append(path[k])
 
-    np.save(config.save_dir+'input.npy', np.array([input_arr]))
+    """np.save(config.save_dir+'input.npy', np.array([input_arr]))
     #np.save(config.save_dir+'output.npy', np.array([output_arr]))
     #np.save(config.save_dir+'target.npy', np.array([target_arr]))
     np.save(config.save_dir+'id.npy', np.array([id_arr]))"""
