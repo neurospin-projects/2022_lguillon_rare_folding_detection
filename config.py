@@ -2,8 +2,8 @@ class Config:
 
     def __init__(self):
         self.model = 'vae'
-        self.batch_size = 16
-        self.nb_epoch = 150 #300
+        self.batch_size = 8
+        self.nb_epoch = 100 #300
         self.n = 150
         self.kl = 2
         self.weight = 2
@@ -12,7 +12,7 @@ class Config:
         self.in_shape = (1, 80, 80, 96) # input size with padding
         self.min_size = 300
 
-        self.save_dir = f"/neurospin/dico/lguillon/inpainting/"
+        self.save_dir = f"/neurospin/dico/lguillon/inpainting/b8/"
 
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
                         'hcp/crops/1mm/SC/no_mask/'

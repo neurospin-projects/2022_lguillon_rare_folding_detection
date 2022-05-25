@@ -71,7 +71,7 @@ if __name__ == '__main__':
     #                        [round(0.8*len(subset1)), round(0.2*len(subset1))])
     trainloader = torch.utils.data.DataLoader(
                   train_set,
-                  batch_size=8,
+                  batch_size=config.batch_size,
                   num_workers=8,
                   shuffle=True)
     valloader = torch.utils.data.DataLoader(

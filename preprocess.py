@@ -34,6 +34,7 @@
 # knowledge of the CeCILL license version 2 and that you accept its terms.
 
 import os
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -117,9 +118,9 @@ class InpaintDataset():
     def __init__(self, foldlabels, skeletons, distmaps, filenames, data_transforms):
         torch.manual_seed(17)
         print('inpaint')
-        self.foldlabel = foldlabels
-        self.skeletons = skeletons
-        self.distmaps = distmaps
+        self.foldlabel = foldlabels.copy()
+        self.skeletons = skeletons.copy()
+        self.distmaps = distmaps.copy()
         self.filenames = filenames
         self.data_transforms = data_transforms
         self.config = Config()
@@ -194,6 +195,10 @@ def convert2Distmap(skeleton):
     os.system(cmd_distMap)
     vol_distmap = aims.read(temp_file_distmap)
     distmap = np.asarray(vol_distmap)
+
+    # os.remove(temp_file_skel)
+    # os.remove(temp_file_distmap)
+    shutil.rmtree(temp_dir)
 
     return distmap
 

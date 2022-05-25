@@ -100,23 +100,23 @@ def create_inpaint_subset(config, mode='train'):
         subset: Dataset corresponding to HCP
     """
     np.random.seed(1)
-    print('ici')
 
     filenames_ref = np.load(os.path.join(config.train_idx_dir,
                                     "train_sub_id.npy"))
 
     distmaps = np.load(os.path.join(config.data_dir, "Rskel_distmaps",
                                     "skel_distmap_1mm.npy"),
-                       mmap_mode='c')
+                       mmap_mode='r')
 
     skeletons = np.load(os.path.join(config.data_dir, "Rskeletons",
                                     "skeletons_1mm.npy"),
-                       mmap_mode='c')
+                       mmap_mode='r')
     filenames = np.load(os.path.join(config.data_dir,"Rfoldlabels",
                                     "sub_id.npy"))
     foldlabels = np.load(os.path.join(config.data_dir, "Rfoldlabels",
                                     "foldlabels_1mm.npy"),
-                       mmap_mode='c')
+                       mmap_mode='r')
+    print('ici')
     sorter = np.argsort(filenames)
     filenames_idx = sorter[np.searchsorted(filenames, filenames_ref, sorter=sorter)]
     filenames = filenames[filenames_idx]
@@ -133,6 +133,7 @@ def create_inpaint_subset(config, mode='train'):
     train_skeletons, train_foldlabels = skeletons[train_idx], foldlabels[train_idx]
     val_distmaps, val_filenames = distmaps[val_idx], filenames[val_idx]
     val_skeletons, val_foldlabels = skeletons[val_idx], foldlabels[val_idx]
+    print('la')
 
     #data = np.array([foldlabels, skeletons, distmaps])
 

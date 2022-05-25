@@ -77,7 +77,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
     list_loss_train, list_loss_val = [], []
 
     # arrays enabling to see model reconstructions
-    id_arr, phase_arr, input_arr, output_arr = [], [], [], []
+    id_arr, phase_arr, input_arr, output_arr, target_arr = [], [], [], [], []
 
     for epoch in range(config.nb_epoch):
         running_loss = 0.0
@@ -119,12 +119,14 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         running_loss = 0.0
 
         """ Saving of reconstructions for visualization in Anatomist software """
-        if epoch == nb_epoch-1:
+        #if epoch == nb_epoch-1:
+        if epoch%10==0:
             for k in range(len(path)):
                 id_arr.append(path[k])
-                phase_arr.append('train')
+                phase_arr.append(f"train_epoch_{epoch}")
                 input_arr.append(np.array(np.squeeze(inputs[k]).cpu().detach().numpy()))
                 output_arr.append(np.squeeze(output[k]).cpu().detach().numpy())
+                target_arr.append(np.squeeze(distmap[k]).cpu().detach().numpy())
 
         # Validation loss
         val_loss = 0.0
@@ -159,16 +161,18 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         early_stopping(valid_loss, vae)
 
         """ Saving of reconstructions for visualization in Anatomist software """
-        if early_stopping.early_stop or epoch == nb_epoch-1:
+        #if early_stopping.early_stop or epoch == nb_epoch-1:
+        if epoch%10==0:
             for k in range(len(path)):
                 id_arr.append(path[k])
-                phase_arr.append('val')
+                phase_arr.append(f"val_epoch_{epoch}")
                 input_arr.append(np.array(np.squeeze(inputs[k]).cpu().detach().numpy()))
                 output_arr.append(np.squeeze(output[k]).cpu().detach().numpy())
-            break
-    for key, array in {'input': input_arr, 'output' : output_arr,
-                           'phase': phase_arr, 'id': id_arr}.items():
-        np.save(config.save_dir+key, np.array([array]))
+                target_arr.append(np.squeeze(distmap[k]).cpu().detach().numpy())
+            #break
+            for key, array in {'input': input_arr, 'output' : output_arr,
+                                   'phase': phase_arr, 'id': id_arr}.items():
+                np.save(config.save_dir+key+str(epoch), np.array([array]))
         #np.save(f"/neurospin/dico/lguillon/miccai_22/gridsearch_sub/n_{curr_config['n']}_kl_{curr_config['kl']}/"+key, np.array([array]))
 
     plot_loss(list_loss_train[1:], config.save_dir+'tot_train_')
