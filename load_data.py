@@ -207,6 +207,61 @@ def create_benchmark_subset(config, benchmark_dir, gridsearch=False,
     return subset
 
 
+def create_inpaint_benchmark_subset(config, benchmark_dir, gridsearch=False,
+                            bench=False):
+    """
+    Creates dataset from benchmark data to identify ambiguous subjects
+    Benchmark is composed of crops of precentral and postcentral sulci
+
+    Args:
+        config: instance of class Config
+
+    Returns:
+        subset: Dataset corresponding to benchmark data
+    """
+    if gridsearch:
+        if bench=='pre':
+            df = pd.read_csv("/neurospin/dico/lguillon/distmap/" \
+                             "pre_post_ambiguity_search/subject_pre.csv")
+        elif bench=='post':
+            df = pd.read_csv("/neurospin/dico/lguillon/distmap/" \
+                             "pre_post_ambiguity_search/subject_post.csv")
+    else:
+        df = pd.read_csv(config.subject_dir)
+
+    train_list = np.array(list(df.subjects))
+
+    filenames = np.load('/neurospin/dico/lguillon/distmap/data/train_sub_id.npy')
+
+
+    distmaps = np.load(os.path.join(benchmark_dir, "skel_distmap_1mm.npy"),
+                       mmap_mode='r')
+
+    skeletons = np.load(os.path.join(benchmark_dir, "Rskeletons",
+                                    "skeletons_1mm.npy"),
+                       mmap_mode='r')
+    # filenames = np.load(os.path.join(benchmark_dir,"Rfoldlabels",
+    #                                 "sub_id.npy"))
+    foldlabels = np.load(os.path.join(benchmark_dir, "foldlabels_1mm.npy"),
+                       mmap_mode='r')
+
+    sorter = np.argsort(filenames)
+    filenames_idx = sorter[np.searchsorted(filenames, train_list, sorter=sorter)]
+    filenames = filenames[filenames_idx]
+    distmaps = distmaps[filenames_idx]
+    foldlabels = foldlabels[filenames_idx]
+    skeletons = skeletons[filenames_idx]
+
+    print(distmaps.shape, filenames.shape)
+
+    subset = InpaintDataset(foldlabels=foldlabels,
+                            filenames=filenames,
+                            skeletons = skeletons,
+                            distmaps = distmaps,
+                            data_transforms=False)
+    return subset
+
+
 def create_one_handed_subset(config):
     """
     Creates dataset from benchmark data: crops of precentral and postcentral

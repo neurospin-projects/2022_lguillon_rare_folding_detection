@@ -193,12 +193,12 @@ class ModelTester():
             print(loader_name)
             self.model.eval()
             with torch.no_grad():
-                for inputs, path in loader:
-                    print(np.unique(inputs))
-                    inputs = Variable(inputs).to(device, dtype=torch.float32)
+                for distmap_masked, distmap, path in loader:
+                    inputs = Variable(distmap_masked).to(device, dtype=torch.float32)
+                    distmap = Variable(distmap).to(device, dtype=torch.float32)
                     output, z, logvar = self.model(inputs)
                     #target = torch.squeeze(inputs, dim=1).long()
-                    recon_loss_val, kl_val, loss_val = vae_loss(inputs, output, z, logvar, self.loss_func,
+                    recon_loss_val, kl_val, loss_val = vae_loss(distmap, output, z, logvar, self.loss_func,
                                      kl_weight=self.kl_weight)
 
                     for k in range(len(path)):

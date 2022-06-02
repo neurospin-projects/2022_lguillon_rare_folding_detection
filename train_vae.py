@@ -57,8 +57,10 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         final_loss_val
     """
     torch.manual_seed(0)
-    writer = SummaryWriter(comment=f"inpainting_{config.n}_kl_{config.kl}")
+    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/runs/inpainting_{config.n}_kl_{config.kl}_{config.batch_size}_{config.lr}",
+                           comment=f"inpainting_{config.n}_kl_{config.kl}")
     lr = config.lr
+    print(lr)
     #vae = VAE(config.in_shape, curr_config['n'], depth=3)
     print(config.in_shape, config.n)
     vae = VAE(config.in_shape, config.n, depth=3)
@@ -173,7 +175,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
             for key, array in {'input': input_arr, 'output' : output_arr,
                                    'phase': phase_arr, 'id': id_arr}.items():
                 np.save(config.save_dir+key+str(epoch), np.array([array]))
-        #np.save(f"/neurospin/dico/lguillon/miccai_22/gridsearch_sub/n_{curr_config['n']}_kl_{curr_config['kl']}/"+key, np.array([array]))
+        np.save(f"/volatile/lg261972/inpainting/gridsearch/n_{config.n}_kl_{config.kl}_lr_{config.lr}_bs_{config.batch_size}/"+key, np.array([array]))
 
     plot_loss(list_loss_train[1:], config.save_dir+'tot_train_')
     plot_loss(list_loss_val[1:], config.save_dir+'tot_val_')

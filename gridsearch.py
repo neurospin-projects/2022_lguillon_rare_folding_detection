@@ -53,7 +53,7 @@ from vae import ModelTester
 #from preprocess import AugDatasetTransformer
 from train_vae import train_vae
 from analyses.evaluate_model import anomaly_score, classifier
-from load_data import create_subset, create_benchmark_subset
+from load_data import create_subset, create_inpaint_benchmark_subset, create_inpaint_subset
 from config import Config
 
 
@@ -75,12 +75,17 @@ def gridsearch_bVAE_sub1():
             vae = nn.DataParallel(vae)
 
     """ Load data and generate torch datasets """
-    train_set, val_set = create_subset(config, mode='train')
+    train_set, val_set = create_inpaint_subset(config, mode='train')
 
     criterion = torch.nn.MSELoss(reduction='sum')
 
+    # grid_config = {"kl": [2, 4, 8, 10],
+    #           "n": [4, 20, 40, 50, 75, 100, 150]
+    # }
     grid_config = {"kl": [2, 4, 8, 10],
-              "n": [4, 20, 40, 50, 75, 100, 150]
+              "n": [4, 20],
+              "lr": [1e-3],
+              "batch_size": [8, 16]
     }
 
     """control_loader = torch.utils.data.DataLoader(control_dataset, batch_size=1,
@@ -91,10 +96,11 @@ def gridsearch_bVAE_sub1():
                                                     shuffle=True, num_workers=8)"""
 
 
-    for kl, n in list(itertools.product(grid_config["kl"], grid_config["n"])):
-        cur_config = {"kl": kl, "n": n}
-        config.kl, config.n = kl, n
-        root_dir = f"/neurospin/dico/lguillon/distmap/gridsearch_lr5e-4/n_{n}_kl_{kl}/"
+    for kl, n, lr, batch_size in list(itertools.product(grid_config["kl"], grid_config["n"],
+                                        grid_config["lr"], grid_config["batch_size"])):
+        cur_config = {"kl": kl, "n": n, "lr": lr, "batch_size": batch_size}
+        config.kl, config.n, config.lr, config.batch_size = kl, n, lr, batch_size
+        root_dir = f"/volatile/lg261972/inpainting/gridsearch/n_{n}_kl_{kl}_lr_{lr}_bs_{batch_size}/"
         #root_dir = config.save_dir
         res = {}
 
@@ -104,7 +110,7 @@ def gridsearch_bVAE_sub1():
             print("Directory " , root_dir ,  " already exists")
             pass
         print(cur_config)
-
+        print(config.kl, config.n, config.lr, config.batch_size)
         trainloader = torch.utils.data.DataLoader(
                   train_set,
                   batch_size=config.batch_size,
@@ -133,9 +139,9 @@ def gridsearch_bVAE_sub1():
                                                 batch_size=config.batch_size,
                                                 num_workers=8,
                                                 shuffle=False)
-        benchmark_pre = create_benchmark_subset(config, config.benchmark_dir_1,
+        benchmark_pre = create_inpaint_benchmark_subset(config, config.benchmark_dir_1,
                                                 gridsearch=True, bench='pre')
-        benchmark_post = create_benchmark_subset(config, config.benchmark_dir_2,
+        benchmark_post = create_inpaint_benchmark_subset(config, config.benchmark_dir_2,
                                                  gridsearch=True, bench='post')
         benchloader_pre = torch.utils.data.DataLoader(
                           benchmark_pre,

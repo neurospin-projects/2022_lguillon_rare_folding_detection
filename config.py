@@ -12,7 +12,7 @@ class Config:
         self.in_shape = (1, 80, 80, 96) # input size with padding
         self.min_size = 300
 
-        self.save_dir = f"/neurospin/dico/lguillon/inpainting/b8/"
+        self.save_dir = f"/volatile/lg261972/inpainting/gridsearch/"
 
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
                         'hcp/crops/1mm/SC/no_mask/'
@@ -33,5 +33,6 @@ class Config:
         self.one_handed_dir = '/neurospin/dico/data/deep_folding/current/crops/SC/' \
                          'mask/sulcus_based/2mm/one_handed_dataset/'
 
-        self.benchmark_dir_2 = '/neurospin/dico/data/deep_folding/current/' \
-                        'datasets/hcp/crops/1mm/postcentral/no_mask/benchmark'
+        # self.benchmark_dir_2 = '/neurospin/dico/data/deep_folding/current/' \
+        #                 'datasets/hcp/crops/1mm/postcentral/no_mask/benchmark'
+        self.benchmark_dir_2 = '/volatile/lg261972/extra_deep_folding/'
