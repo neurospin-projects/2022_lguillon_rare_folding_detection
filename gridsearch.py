@@ -84,7 +84,7 @@ def gridsearch_bVAE_sub1():
     # }
     grid_config = {"kl": [2, 4, 8, 10],
               "n": [4, 20],
-              "lr": [1e-3],
+              "lr": [5e-4],
               "batch_size": [8, 16]
     }
 
