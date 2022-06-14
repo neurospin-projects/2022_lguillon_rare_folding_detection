@@ -268,7 +268,8 @@ class randomSuppression(object):
         ## suppression of chosen folds
         skeleton[self.foldlabel==9999] = -1
         assert(np.count_nonzero(skeleton==-1)>=100)
-        skeleton[skeleton==-1] = 0
+        #skeleton[skeleton==-1] = 0
+        skeleton[skeleton==-1] = 1
 
         ## writing of deleted folds to reconstruct in target
         target[self.foldlabel==9999] = 1
