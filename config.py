@@ -4,7 +4,7 @@ class Config:
         self.model = 'vae'
         self.batch_size = 8
         self.nb_epoch = 100 #300
-        self.n = 150
+        self.n = 100
         self.kl = 2
         self.weight = 2
         self.lr = 1e-4
@@ -12,7 +12,8 @@ class Config:
         self.in_shape = (1, 80, 80, 96) # input size with padding
         self.min_size = 300
 
-        self.save_dir = f"/volatile/lg261972/inpainting/gridsearch/"
+        #self.save_dir = f"/volatile/lg261972/inpainting/gridsearch/"
+        self.save_dir ="/neurospin/dico/lguillon/inpainting/exp_comp/ss_properties/800/"
 
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
                         'hcp/crops/1mm/SC/no_mask/'

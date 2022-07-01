@@ -57,7 +57,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         final_loss_val
     """
     torch.manual_seed(0)
-    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/runs/inpainting_{config.n}_kl_{config.kl}_{config.batch_size}_{config.lr}",
+    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/exp_comp/runs/inpainting_{config.n}_kl_{config.kl}_{config.batch_size}_{config.lr}_ss_size_800",
                            comment=f"inpainting_{config.n}_kl_{config.kl}")
     lr = config.lr
     print(lr)
@@ -114,6 +114,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         writer.add_image('target', images[1].unsqueeze(0), epoch)
         writer.add_image('output', images[2].unsqueeze(0), epoch)
         writer.add_scalar('Loss/train', running_loss / epoch_steps, epoch)
+        writer.add_scalar('KL Loss/train', kl/ epoch_steps, epoch)
+        writer.add_scalar('recon Loss/train', recon_loss/ epoch_steps, epoch)
         writer.close()
         print("[%d] loss: %.3f" % (epoch + 1,
                                         running_loss / epoch_steps))
@@ -153,6 +155,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         images = [inputs[0][0][20][:][:],\
                   output[0][0][20][:][:]]
         writer.add_scalar('Loss/val', valid_loss, epoch)
+        writer.add_scalar('KL Loss/val', kl_val/ epoch_steps, epoch)
+        writer.add_scalar('recon Loss/val', recon_loss_val/ epoch_steps, epoch)
         writer.add_image('inputs VAL', images[0].unsqueeze(0), epoch)
         writer.add_image('output VAL', images[1].unsqueeze(0), epoch)
 
@@ -163,19 +167,20 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         early_stopping(valid_loss, vae)
 
         """ Saving of reconstructions for visualization in Anatomist software """
-        #if early_stopping.early_stop or epoch == nb_epoch-1:
-        if epoch%10==0:
+        if early_stopping.early_stop or epoch == nb_epoch-1:
+            #if epoch%10==0:
             for k in range(len(path)):
                 id_arr.append(path[k])
                 phase_arr.append(f"val_epoch_{epoch}")
                 input_arr.append(np.array(np.squeeze(inputs[k]).cpu().detach().numpy()))
                 output_arr.append(np.squeeze(output[k]).cpu().detach().numpy())
                 target_arr.append(np.squeeze(distmap[k]).cpu().detach().numpy())
-            #break
+
             for key, array in {'input': input_arr, 'output' : output_arr,
                                    'phase': phase_arr, 'id': id_arr}.items():
                 np.save(config.save_dir+key+str(epoch), np.array([array]))
-        np.save(f"/volatile/lg261972/inpainting/gridsearch/n_{config.n}_kl_{config.kl}_lr_{config.lr}_bs_{config.batch_size}/"+key, np.array([array]))
+            break
+        #np.save(f"/volatile/lg261972/inpainting/exp_comp/n_{config.n}_kl_{config.kl}_lr_{config.lr}_bs_{config.batch_size}/"+key, np.array([array]))
 
     plot_loss(list_loss_train[1:], config.save_dir+'tot_train_')
     plot_loss(list_loss_val[1:], config.save_dir+'tot_val_')

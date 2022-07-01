@@ -251,12 +251,15 @@ class randomSuppression(object):
 
     def random_choice(self):
         folds_list = np.unique(self.foldlabel, return_counts=True)
-        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>100}
+        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>500}
         # We don't take into account the background in the random choice of fold
         folds_dico.pop(0, None)
 
         # Random choice of fold
-        self.fold = random.choice(list(folds_dico.keys()))
+        try:
+            self.fold = random.choice(list(folds_dico.keys()))
+        except IndexError:
+            pass
 
     def __call__(self, skeleton):
         target = np.zeros(list(skeleton.shape))
@@ -268,8 +271,9 @@ class randomSuppression(object):
         ## suppression of chosen folds
         skeleton[self.foldlabel==9999] = -1
         assert(np.count_nonzero(skeleton==-1)>=100)
-        #skeleton[skeleton==-1] = 0
-        skeleton[skeleton==-1] = 1
+        print(np.count_nonzero(skeleton==-1))
+        skeleton[skeleton==-1] = 0
+        #skeleton[skeleton==-1] = 1
 
         ## writing of deleted folds to reconstruct in target
         target[self.foldlabel==9999] = 1
