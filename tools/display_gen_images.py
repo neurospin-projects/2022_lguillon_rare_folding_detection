@@ -14,6 +14,7 @@ def array_to_ana(ana_a, img, sub_id, phase, status):
     Returns volume displayable by Anatomist
     """
     vol_img = aims.Volume(img)
+    #vol_img = img
     a_vol_img = ana_a.toAObject(vol_img)
     vol_img.header()['voxel_size'] = [1, 1, 1]
     a_vol_img.setName(status+'_'+ str(sub_id)+'_'+str(phase)) # display name
@@ -31,19 +32,22 @@ def main():
     (It's better to choose an even number for number of columns to display)
     """
     root_dir = "/neurospin/dico/lguillon/distmap/"
-
+    root_dir = '/tmp/'
     a = anatomist.Anatomist()
     block = a.AWindowsBlock(a, 12)  # Parameter 6 corresponds to the number of columns displayed. Can be changed.
 
-    input_arr = np.load(root_dir+'input.npy').astype('float32') # Input
-    output_arr = np.load(root_dir+'output.npy').astype('float32') # Input
-    id_arr = np.load(root_dir+'id.npy') # Subject id
+    input_arr = np.load(root_dir+'test_input.npy').astype('float32') # Input
+    # output_arr = np.load(root_dir+'output.npy').astype('float32') # Input
+    # id_arr = np.load(root_dir+'id.npy') # Subject id
 
-    for k in range(len(id_arr)):
-        img = input_arr[k]
-        output = output_arr[0][k].astype(float)
-        sub_id = id_arr[k]
-        for img, entry in [(input, 'input'), (output, 'output')]:
+    for k in range(len(input_arr)):
+        img = input_arr[0]
+        print(img.shape)
+        # output = output_arr[0][k].astype(float)
+        # sub_id = id_arr[k]
+        sub_id = 'test'
+        # for img, entry in [(input, 'input'), (output, 'output')]:
+        for img, entry in [(input, 'input')]:
             globals()['block%s%s' % (sub_id, entry)] = a.createWindow('Sagittal', block=block)
 
             globals()['img%s%s' % (sub_id, entry)], globals()['a_img%s%s' % (sub_id, entry)] = array_to_ana(a, img, sub_id, phase='', status=entry)

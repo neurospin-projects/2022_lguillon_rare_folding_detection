@@ -154,7 +154,7 @@ def create_inpaint_subset(config, mode='train'):
                                  skeletons = val_skeletons,
                                  distmaps = val_distmaps,
                                  filenames=val_filenames,
-                                  data_transforms=False)
+                                  data_transforms=True)
         return train_set, val_set
 
     else:

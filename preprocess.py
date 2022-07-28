@@ -143,12 +143,12 @@ class InpaintDataset():
                 angle = np.random.uniform(-10, 10)
 
             fill_value = 0
-            a = transforms.Compose([ApplyMask()])
-            foldlabel = a(foldlabel)
-            b = transforms.Compose([randomSuppression(foldlabel)])
-            skeleton, target = b(skeleton)
-            distmap_masked = convert2Distmap(skeleton)
             if self.data_transforms:
+                a = transforms.Compose([ApplyMask()])
+                foldlabel = a(foldlabel)
+                b = transforms.Compose([randomSuppression(foldlabel)])
+                skeleton, target = b(skeleton)
+                distmap_masked = convert2Distmap(skeleton)
                 self.transform = transforms.Compose([
                                         RotateTensor(filename, angle),
                                         ApplyMask(),
@@ -156,6 +156,13 @@ class InpaintDataset():
                                         Padding(list(self.config.in_shape),
                                                 fill_value=fill_value)
                                         ])
+                distmap_masked = np.squeeze(distmap_masked)
+                distmap = np.squeeze(distmap)
+                #target = np.squeeze(target)
+
+                tuple_with_path = (self.transform(distmap_masked),
+                                   self.transform(distmap),
+                                   filename)
             else:
                 self.transform = transforms.Compose([
                                         NormalizeSkeleton(),
@@ -163,13 +170,13 @@ class InpaintDataset():
                                         Padding(list(self.config.in_shape),
                                                 fill_value=fill_value)
                                         ])
-            distmap_masked = np.squeeze(distmap_masked)
-            distmap = np.squeeze(distmap)
-            #target = np.squeeze(target)
+                distmap = np.squeeze(distmap)
+                #target = np.squeeze(target)
 
-            tuple_with_path = (self.transform(distmap_masked),
-                               self.transform(distmap),
-                               filename)
+                tuple_with_path = (self.transform(distmap),
+                                   self.transform(distmap),
+                                   filename)
+
             # tuple_with_path = (self.transform(distmap_masked),
             #                    self.transform(target),
             #                    filename)
@@ -224,7 +231,7 @@ class RotateTensor(object):
     """Apply a random rotation on the images
     """
 
-    def __init__(self, filename, angle, max_angle=10):
+    def __init__(self, filename, angle, max_angle=3):
         torch.manual_seed(17)
         self.config = Config()
         self.filename = filename
@@ -270,8 +277,8 @@ class randomSuppression(object):
 
         ## suppression of chosen folds
         skeleton[self.foldlabel==9999] = -1
-        assert(np.count_nonzero(skeleton==-1)>=100)
-        print(np.count_nonzero(skeleton==-1))
+        assert(np.count_nonzero(skeleton==-1)>=500)
+        #print(np.count_nonzero(skeleton==-1))
         skeleton[skeleton==-1] = 0
         #skeleton[skeleton==-1] = 1
 

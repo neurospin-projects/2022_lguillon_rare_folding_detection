@@ -13,7 +13,7 @@ class Config:
         self.min_size = 300
 
         #self.save_dir = f"/volatile/lg261972/inpainting/gridsearch/"
-        self.save_dir ="/neurospin/dico/lguillon/inpainting/exp_comp/ss_properties/800/"
+        self.save_dir ="/neurospin/dico/lguillon/inpainting/exp_comp/ss_properties/500_2/"
 
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
                         'hcp/crops/1mm/SC/no_mask/'

@@ -14,10 +14,10 @@ def array_to_ana(ana_a, img, phase, status):
     name of the volume displayed in Anatomist window.
     Returns volume displayable by Anatomist
     """
-    #vol_img = aims.Volume(img)
-    vol_img = img
+    vol_img = aims.Volume(img)
+    #vol_img = img
     a_vol_img = ana_a.toAObject(vol_img)
-    vol_img.header()['voxel_size'] = [1, 1, 1]
+    #vol_img.header()['voxel_size'] = [1, 1, 1]
     a_vol_img.setName(status+'_'+'_'+str(phase)) # display name
     a_vol_img.setChanged()
     a_vol_img.notifyObservers()
@@ -33,20 +33,22 @@ def main():
     (It's better to choose an even number for number of columns to display)
     """
     root_dir = "/neurospin/dico/lguillon/distmap/analyses_gridsearch/75_2/through_latent_space/"
-    buckets = True
+    root_dir = "/tmp/"
+
+    buckets = False
 
     a = anatomist.Anatomist()
     block = a.AWindowsBlock(a, 12)  # Parameter 6 corresponds to the number of columns displayed. Can be changed.
 
     #input_arr = np.load(root_dir+'centroid_input.npy').astype('float32') # Input
-    output_arr = np.load(root_dir+'centroid_out.npy').astype('float32') # Input
+    output_arr = np.load(root_dir+'test_input.npy').astype('float32') # Input
     #error_arr = np.load(root_dir+'centroid_error.npy').astype('float32')  # Subject id
     #print(input_arr.shape)
 
     output = output_arr.astype(float)
     for k in range(len(output_arr)):
         #input = input_arr[k][0]
-        output = output_arr
+        output = output_arr[k][0]
         #error_map = error_arr[k][0]
 
         if buckets :

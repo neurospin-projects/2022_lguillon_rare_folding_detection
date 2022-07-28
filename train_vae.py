@@ -57,8 +57,8 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         final_loss_val
     """
     torch.manual_seed(0)
-    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/exp_comp/runs/inpainting_{config.n}_kl_{config.kl}_{config.batch_size}_{config.lr}_ss_size_800",
-                           comment=f"inpainting_{config.n}_kl_{config.kl}")
+    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/exp_comp/runs/inpainting_{config.n}_kl_{config.kl}_{config.batch_size}_{config.lr}_ss_size_500_2",
+                           comment=f"inpainting_{config.n}_kl_{config.kl}_ss_size_500_2")
     lr = config.lr
     print(lr)
     #vae = VAE(config.in_shape, curr_config['n'], depth=3)
