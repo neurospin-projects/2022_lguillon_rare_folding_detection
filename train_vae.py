@@ -56,8 +56,10 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         vae: trained model
         final_loss_val
     """
-    torch.manual_seed(0)
-    writer = SummaryWriter(comment=f"rotation_-3_3_{config.n}_kl_{config.kl}")
+    torch.manual_seed(10)
+    writer = SummaryWriter(log_dir='/neurospin/dico/lguillon/distmap/CCD/'\
+                                    'runs_tensorboard/runs/LEFT_ccd_75_2_seed_10',
+                            comment=f"ccd_{config.n}_kl_{config.kl}")
     lr = config.lr
     #vae = VAE(config.in_shape, curr_config['n'], depth=3)
     print(config.in_shape, config.n)

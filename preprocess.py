@@ -90,6 +90,9 @@ class SkeletonDataset():
                                                 fill_value=fill_value)
                                         ])
             else:
+                print('ici')
+                if sample.shape[0] == 2:
+                    sample = sample[0]
                 #sample = np.squeeze(sample, axis=4)
                 sample = np.squeeze(sample)
                 self.transform = transforms.Compose([
@@ -109,11 +112,12 @@ class ApplyMask(object):
         self.config = Config()
 
         mask = aims.read(os.path.join(self.config.aug_dir,
-                                      'mask_cropped.nii.gz'))
+                                      'Lmask_cropped.nii.gz'))
         self.mask = np.asarray(mask)
         self.mask = np.squeeze(self.mask)
 
     def __call__(self, arr):
+        arr= np.array(arr)
         arr[self.mask==0] = 0
         arr = np.expand_dims(arr, axis=0)
 

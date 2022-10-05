@@ -63,9 +63,9 @@ def create_subset(config, mode):
     np.random.seed(1)
 
     filenames = np.load(os.path.join(config.data_dir,
-                                    "train_sub_id.npy"))
+                                    "Ltrain_sub_id.npy"))
     distmaps = np.load(os.path.join(config.data_dir,
-                                    "train_distmap.npy"),
+                                    "Ltrain_distmap.npy"),
                        mmap_mode='r')
     #filenames = filenames[:200]
     #distmaps = distmaps[:200]

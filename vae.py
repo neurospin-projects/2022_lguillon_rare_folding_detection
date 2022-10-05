@@ -203,7 +203,8 @@ class ModelTester():
 
                     for k in range(len(path)):
                         out_z = np.array(np.squeeze(z[k]).cpu().detach().numpy())
+                        var = np.array(np.squeeze(logvar[k].exp()).cpu().detach().numpy())
                         #results[loader_name][path[k]] = loss_val, out_z, recon_loss_val
-                        results[loader_name][path[k]] = loss_val, out_z, recon_loss_val, inputs
+                        results[loader_name][path[k]] = loss_val, out_z, recon_loss_val, inputs, var
 
         return results

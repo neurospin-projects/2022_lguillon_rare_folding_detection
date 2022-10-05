@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     config = Config()
 
-    torch.manual_seed(0)
+    torch.manual_seed(10)
     save_dir = config.save_dir
 
     """ Load data and generate torch datasets """
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     except FileExistsError:
         print("Directory " , save_dir ,  " already exists")
         pass
-    print(cur_config)
+    #print(cur_config)
 
     """ Train model for given configuration """
     if config.model == 'vae':
