@@ -45,6 +45,7 @@ import torchvision.transforms as transforms
 from scipy.ndimage import rotate, find_objects, shift
 from scipy.special import expit
 from soma import aims, aimsalgo
+import dico_toolbox as dtx
 
 import deep_folding as df
 from config import Config
@@ -117,13 +118,13 @@ class InpaintDataset():
     """
     def __init__(self, foldlabels, skeletons, distmaps, filenames, data_transforms):
         torch.manual_seed(17)
-        print('inpaint')
         self.foldlabel = foldlabels.copy()
         self.skeletons = skeletons.copy()
         self.distmaps = distmaps.copy()
         self.filenames = filenames
         self.data_transforms = data_transforms
         self.config = Config()
+        self.flag = True
 
     def __len__(self):
         return len(self.distmaps)
@@ -139,15 +140,26 @@ class InpaintDataset():
                 foldlabel = self.foldlabel[idx]
                 skeleton = self.skeletons[idx]
                 distmap = self.distmaps[idx]
-
+                if self.flag:
+                    foldlabel_test, skeleton_test = foldlabel.copy(), skeleton.copy()
+                    foldlabel_test[foldlabel_test>0] = 1
+                    skeleton_test[skeleton_test>0] = 1
+                    #if np.array_equal(foldlabel_test,skeleton_test):
+                    assert(np.array_equal(foldlabel_test,skeleton_test))
+                    self.flag =False
+                # aims.write(aims.Volume(np.squeeze(foldlabel_test)), f"/tmp/foldlabel_{idx}.nii.gz")
+                # aims.write(aims.Volume(np.squeeze(skeleton_test)), f"/tmp/skeleton_{idx}.nii.gz")
+                # aims.write(aims.Volume(np.squeeze(distmap)), f"/tmp/distmap_{idx}.nii.gz")
                 angle = np.random.uniform(-10, 10)
 
             fill_value = 0
             if self.data_transforms:
-                a = transforms.Compose([ApplyMask()])
-                foldlabel = a(foldlabel)
-                b = transforms.Compose([randomSuppression(foldlabel)])
-                skeleton, target = b(skeleton)
+                mask = transforms.Compose([ApplyMask()])
+                foldlabel = mask(foldlabel)
+                inpaint = transforms.Compose([randomSuppression(foldlabel)])
+                skeleton, target = inpaint(skeleton)
+                #aims.write(dtx.convert.volume_to_bucketMap_aims(np.squeeze(skeleton)), f"/tmp/skel_masked_{idx}.bck")
+                #aims.write(aims.Volume(np.squeeze(foldlabel_test)), f"/tmp/foldlabel_{idx}.nii.gz")
                 distmap_masked = convert2Distmap(skeleton)
                 self.transform = transforms.Compose([
                                         RotateTensor(filename, angle),
@@ -163,6 +175,8 @@ class InpaintDataset():
                 tuple_with_path = (self.transform(distmap_masked),
                                    self.transform(distmap),
                                    filename)
+                # aims.write(aims.Volume((np.squeeze(distmap_masked))), f"/tmp/dist_masked_{idx}.nii.gz")
+                # aims.write(aims.Volume((np.squeeze(distmap))), f"/tmp/dist_{idx}.nii.gz")
             else:
                 self.transform = transforms.Compose([
                                         NormalizeSkeleton(),
@@ -177,13 +191,6 @@ class InpaintDataset():
                                    self.transform(distmap),
                                    filename)
 
-            # tuple_with_path = (self.transform(distmap_masked),
-            #                    self.transform(target),
-            #                    filename)
-            # dist_vol = aims.Volume(distmap)
-            # distM_vol = aims.Volume(distmap_masked)
-            # aims.write(dist_vol, '/tmp/distvol.nii.gz')
-            # aims.write(distM_vol, '/tmp/distvolM.nii.gz')
             return tuple_with_path
 
 def convert2Distmap(skeleton):
@@ -258,7 +265,7 @@ class randomSuppression(object):
 
     def random_choice(self):
         folds_list = np.unique(self.foldlabel, return_counts=True)
-        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>500}
+        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>=300}
         # We don't take into account the background in the random choice of fold
         folds_dico.pop(0, None)
 
@@ -272,18 +279,24 @@ class randomSuppression(object):
         target = np.zeros(list(skeleton.shape))
         assert(target.shape==skeleton.shape)
 
-        self.random_choice()
-        self.foldlabel[self.foldlabel==self.fold] = 9999
+        if random.random()>0.2:
+            self.random_choice()
+            # Selection of selected simple surface
+            self.foldlabel[self.foldlabel==self.fold] = 9999
+            # Selection of associated bottom
+            self.foldlabel[self.foldlabel==self.fold + 6000] = 9999
+            # Selection of other associated junction
+            self.foldlabel[self.foldlabel==self.fold + 5000] = 9999
 
-        ## suppression of chosen folds
-        skeleton[self.foldlabel==9999] = -1
-        assert(np.count_nonzero(skeleton==-1)>=500)
-        #print(np.count_nonzero(skeleton==-1))
-        skeleton[skeleton==-1] = 0
-        #skeleton[skeleton==-1] = 1
+            ## suppression of chosen folds
+            skeleton[self.foldlabel==9999] = -1
+            assert(np.count_nonzero(skeleton==-1)>=300)
+            #print(np.count_nonzero(skeleton==-1))
+            skeleton[skeleton==-1] = 0
+            #skeleton[skeleton==-1] = 1
 
-        ## writing of deleted folds to reconstruct in target
-        target[self.foldlabel==9999] = 1
+            ## writing of deleted folds to reconstruct in target
+            target[self.foldlabel==9999] = 1
 
         return skeleton, target
 

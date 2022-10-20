@@ -51,9 +51,6 @@ from load_data import create_subset, create_inpaint_subset
 from config import Config
 
 
-#tb_logger = pl_loggers.TensorBoardLogger('logs')
-#writer = SummaryWriter()
-
 
 if __name__ == '__main__':
 
@@ -91,20 +88,20 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         device = "cuda:0"
 
-    weights = [1, config.weight]
-    if config.model == 'vae':
-        weights = [1, 2]
+    # weights = [1, config.weight]
+    # if config.model == 'vae':
+    #     weights = [1, 2]
     #class_weights = torch.FloatTensor(weights).to(device)
     #criterion = torch.nn.CrossEntropyLoss(weight=class_weights, reduction='sum')
-    criterion = torch.nn.MSELoss(reduction='sum')
+    # criterion = torch.nn.MSELoss(reduction='sum')
 
-    cur_config = { "n": config.n, "weight": weights}
+    # cur_config = { "n": config.n, "weight": weights}
     try:
         os.mkdir(save_dir)
     except FileExistsError:
         print("Directory " , save_dir ,  " already exists")
         pass
-    print(cur_config)
+    #print(cur_config)
 
     """ Train model for given configuration """
     if config.model == 'vae':

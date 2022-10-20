@@ -13,7 +13,7 @@ class Config:
         self.min_size = 300
 
         #self.save_dir = f"/volatile/lg261972/inpainting/gridsearch/"
-        self.save_dir ="/neurospin/dico/lguillon/inpainting/exp_comp/ss_properties/500_2/"
+        self.save_dir ="/neurospin/dico/lguillon/inpainting/v2/baseline_300/"
 
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
                         'hcp/crops/1mm/SC/no_mask/'
@@ -37,3 +37,5 @@ class Config:
         # self.benchmark_dir_2 = '/neurospin/dico/data/deep_folding/current/' \
         #                 'datasets/hcp/crops/1mm/postcentral/no_mask/benchmark'
         self.benchmark_dir_2 = '/volatile/lg261972/extra_deep_folding/'
+
+        self.list_ss = {}

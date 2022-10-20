@@ -104,26 +104,38 @@ def create_inpaint_subset(config, mode='train'):
     filenames_ref = np.load(os.path.join(config.train_idx_dir,
                                     "train_sub_id.npy"))
 
-    distmaps = np.load(os.path.join(config.data_dir, "Rskel_distmaps",
-                                    "skel_distmap_1mm.npy"),
+    distmaps = np.load(os.path.join(config.data_dir, "Rskel_distmaps_junction",
+                                    "Rskel_distmaps.npy"),
                        mmap_mode='r')
 
-    skeletons = np.load(os.path.join(config.data_dir, "Rskeletons",
-                                    "skeletons_1mm.npy"),
+    # skeletons = np.load(os.path.join(config.data_dir, "Rskeletons",
+    #                                 "skeletons_1mm.npy"),
+    #                    mmap_mode='r')
+    skeletons = np.load(os.path.join(config.data_dir, "Rskeletons_junction",
+                                    "Rskeleton.npy"),
                        mmap_mode='r')
     filenames = np.load(os.path.join(config.data_dir,"Rfoldlabels",
                                     "sub_id.npy"))
-    foldlabels = np.load(os.path.join(config.data_dir, "Rfoldlabels",
-                                    "foldlabels_1mm.npy"),
+    # foldlabels = np.load(os.path.join(config.data_dir, "Rfoldlabels",
+    #                                 "foldlabels_1mm.npy"),
+    #                    mmap_mode='r')
+    foldlabels = np.load(os.path.join('/neurospin/dico/data/deep_folding/'\
+        'current/datasets/hcp/foldlabels/raw/junction/crops/',
+                                    "Rlabels.npy"),
                        mmap_mode='r')
     print('ici')
     sorter = np.argsort(filenames)
+    print(1)
     filenames_idx = sorter[np.searchsorted(filenames, filenames_ref, sorter=sorter)]
+    print(2)
     filenames = filenames[filenames_idx]
+    print(3)
     distmaps = distmaps[filenames_idx]
+    print(4)
     skeletons = skeletons[filenames_idx]
+    print(5)
     foldlabels = foldlabels[filenames_idx]
-
+    print(6)
     indices = list(range(len(filenames_ref)))
     np.random.shuffle(indices)
     split = int(np.floor(0.8 * len(filenames)))
