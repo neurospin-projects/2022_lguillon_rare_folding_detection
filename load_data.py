@@ -62,10 +62,15 @@ def create_subset(config, mode):
     #train_list = np.array(list(df.subjects))
     np.random.seed(1)
 
+    #filenames = np.load(os.path.join(config.data_dir,
+    #                                "Ltrain_sub_id.npy"))
+    #distmaps = np.load(os.path.join(config.data_dir,
+    #                                "Ltrain_distmap.npy"),
+    #                   mmap_mode='r')
     filenames = np.load(os.path.join(config.data_dir,
-                                    "Ltrain_sub_id.npy"))
+                                    "sub_id.npy"))
     distmaps = np.load(os.path.join(config.data_dir,
-                                    "Ltrain_distmap.npy"),
+                                    "distmap_1mm.npy"),
                        mmap_mode='r')
     #filenames = filenames[:200]
     #distmaps = distmaps[:200]
@@ -187,7 +192,17 @@ def main():
     config = Config()
     #subset = create_subset(config)
 
-    benchmark = create_subset(config)
+    train_set, val_set = create_subset(config, 'train')
+
+    trainloader = torch.utils.data.DataLoader(
+                  train_set,
+                  batch_size=1,
+                  num_workers=8,
+                  shuffle=False)
+    for sample, path in trainloader:
+        if path[0]=='812746':
+            print(np.unique(sample))
+            print(path)
 
     """trainloader = torch.utils.data.DataLoader(
                   benchmark,
