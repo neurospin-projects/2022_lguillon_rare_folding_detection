@@ -57,7 +57,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
         final_loss_val
     """
     torch.manual_seed(0)
-    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/v2/inpainting_baseline_300",
+    writer = SummaryWriter(log_dir= f"/volatile/lg261972/inpainting/v2/runs/inpainting_baseline_300/lr5e-4",
                            comment=f"inpainting_baseline_300")
     lr = config.lr
     print(lr)
@@ -74,7 +74,7 @@ def train_vae(config, trainloader, valloader, root_dir=None, curr_config=None):
     optimizer = torch.optim.Adam(vae.parameters(), lr=lr)
 
     nb_epoch = config.nb_epoch
-    early_stopping = EarlyStopping(patience=12, verbose=True, root_dir=root_dir)
+    early_stopping = EarlyStopping(patience=20, verbose=True, root_dir=root_dir)
 
     list_loss_train, list_loss_val = [], []
 

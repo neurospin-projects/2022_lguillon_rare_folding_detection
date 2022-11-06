@@ -7,13 +7,13 @@ class Config:
         self.n = 100
         self.kl = 2
         self.weight = 2
-        self.lr = 1e-4
+        self.lr = 5e-4
         #self.in_shape = (1, 80, 72, 96) # input size with padding
         self.in_shape = (1, 80, 80, 96) # input size with padding
         self.min_size = 300
 
         #self.save_dir = f"/volatile/lg261972/inpainting/gridsearch/"
-        self.save_dir ="/neurospin/dico/lguillon/inpainting/v2/baseline_300/"
+        self.save_dir ="/neurospin/dico/lguillon/inpainting/v2/baseline_300_lr5e-4/"
 
         self.data_dir = '/neurospin/dico/data/deep_folding/current/datasets/' \
                         'hcp/crops/1mm/SC/no_mask/'

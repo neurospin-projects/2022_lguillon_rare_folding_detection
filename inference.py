@@ -105,7 +105,7 @@ class SkeletonDataset():
             return tuple_with_path
 
 
-class InpaintDataset():
+class InpaintDatasetTest():
     """Custom dataset for skeleton images that includes image file paths.
 
     Args:
@@ -180,16 +180,25 @@ class InpaintDataset():
                 # aims.write(aims.Volume((np.squeeze(distmap_masked))), f"/tmp/dist_masked_{idx}.nii.gz")
                 # aims.write(aims.Volume((np.squeeze(distmap))), f"/tmp/dist_{idx}.nii.gz")
             else:
-                self.transform = transforms.Compose([
+                mask = transforms.Compose([ApplyMask()])
+                foldlabel = mask(foldlabel)
+                # List of simple surfaces
+                folds_list = np.unique(self.foldlabel, return_counts=True)
+                folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>=300}
+
+                for ss, ss_size in folds_dico.items():
+                    inpaint = transforms.Compose([inferenceSuppression(foldlabel)])
+
+                    self.transform = transforms.Compose([
                                         NormalizeSkeleton(),
                                         ApplyMask(),
                                         Padding(list(self.config.in_shape),
                                                 fill_value=fill_value)
                                         ])
-                distmap = np.squeeze(distmap)
-                #target = np.squeeze(target)
+                    distmap = np.squeeze(distmap)
+                    #target = np.squeeze(target)
 
-                tuple_with_path = (self.transform(distmap),
+                    tuple_with_path = (self.transform(distmap),
                                    self.transform(distmap),
                                    filename)
 
@@ -299,48 +308,6 @@ class randomSuppression(object):
 
             ## writing of deleted folds to reconstruct in target
             target[self.foldlabel==9999] = 1
-
-        return skeleton, target
-
-
-class randomSuppressionTest(object):
-    """
-    """
-    def __init__(self, foldlabel, min_size=100):
-        self.foldlabel = np.squeeze(foldlabel, axis=0)
-        self.min_size = min_size
-        self.dico_skeletons = {}
-
-    def __call__(self, skeleton):
-        target = np.zeros(list(skeleton.shape))
-        assert(target.shape==skeleton.shape)
-
-        folds_list = np.unique(self.foldlabel, return_counts=True)
-        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>=300}
-        # We don't take into account the background in the random choice of fold
-        folds_dico.pop(0, None)
-
-        for ss, ss_size in folds_dico.items():
-            # Selection of selected simple surface
-            self.foldlabel[self.foldlabel==ss] = 9999
-            # Selection of associated bottom
-            self.foldlabel[self.foldlabel==ss + 6000] = 9999
-            # Selection of other associated junction
-            self.foldlabel[self.foldlabel==ss + 5000] = 9999
-            ## suppression of chosen folds
-            skeleton[self.foldlabel==9999] = -1
-            assert(np.count_nonzero(skeleton==-1)>=300)
-            #print(np.count_nonzero(skeleton==-1))
-            skeleton[skeleton==-1] = 0
-            #skeleton[skeleton==-1] = 1
-
-            ## writing of deleted folds to reconstruct in target
-            target[self.foldlabel==9999] = 1
-
-            if ss_size in self.dico_skeletons:
-                self.dico_skeletons[ss_size].append((skeleton, target))
-            else:
-                self.dico_skeletons[ss_size] = [(skeleton, target)]
 
         return skeleton, target
 
