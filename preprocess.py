@@ -60,7 +60,6 @@ class SkeletonDataset():
                          and padded
     """
     def __init__(self, dataframe, filenames, data_transforms):
-        torch.manual_seed(17)
         self.df = dataframe
         self.filenames = filenames
         self.data_transforms = data_transforms
@@ -90,7 +89,6 @@ class SkeletonDataset():
                                                 fill_value=fill_value)
                                         ])
             else:
-                print('ici')
                 if sample.shape[0] == 2:
                     sample = sample[0]
                 #sample = np.squeeze(sample, axis=4)
@@ -112,7 +110,7 @@ class ApplyMask(object):
         self.config = Config()
 
         mask = aims.read(os.path.join(self.config.aug_dir,
-                                      'Lmask_cropped.nii.gz'))
+                                      'mask_cropped.nii.gz'))
         self.mask = np.asarray(mask)
         self.mask = np.squeeze(self.mask)
 

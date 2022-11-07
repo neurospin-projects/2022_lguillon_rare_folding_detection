@@ -62,16 +62,16 @@ def create_subset(config, mode):
     #train_list = np.array(list(df.subjects))
     np.random.seed(1)
 
-    #filenames = np.load(os.path.join(config.data_dir,
-    #                                "Ltrain_sub_id.npy"))
-    #distmaps = np.load(os.path.join(config.data_dir,
-    #                                "Ltrain_distmap.npy"),
-    #                   mmap_mode='r')
     filenames = np.load(os.path.join(config.data_dir,
-                                    "sub_id.npy"))
+                                   "Rtrain_sub_id.npy"))
     distmaps = np.load(os.path.join(config.data_dir,
-                                    "distmap_1mm.npy"),
-                       mmap_mode='r')
+                                   "Rtrain_distmap.npy"),
+                      mmap_mode='r')
+    # filenames = np.load(os.path.join(config.data_dir,
+    #                                 "sub_id.npy"))
+    # distmaps = np.load(os.path.join(config.data_dir,
+    #                                 "Rdistmap.npy"),
+    #                    mmap_mode='r')
     #filenames = filenames[:200]
     #distmaps = distmaps[:200]
     #print(distmaps.shape)
