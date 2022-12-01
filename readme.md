@@ -3,10 +3,10 @@
 Official Pytorch implementation for https://arxiv.org/abs/2211.16213.
 The project aims to identify rare cortical folding patterns in the central sulcus region thanks to unsupervised deep learning.
 
-![image](./images/graphical_abstract.pdf)
+![image](/images/graphical_abstract.pdf)
 
 ## Data 
-Data are available in the [data](https://github.com/neurospin-projects/2022_lguillon_rare_folding_detection/tree/main/data) directory.
+Data are available in the [data](./data) directory.
 
 
 
