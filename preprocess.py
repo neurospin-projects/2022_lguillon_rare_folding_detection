@@ -126,7 +126,7 @@ class RotateTensor(object):
     """
 
     def __init__(self, filename, max_angle=10):
-        torch.manual_seed(17)
+        #torch.manual_seed(17)
         self.config = Config()
         self.filename = filename
         self.max_angle = max_angle
