@@ -207,3 +207,74 @@ class ModelTester():
                         results[loader_name][path[k]] = loss_val, out_z, recon_loss_val, inputs, output
 
         return results
+
+
+class InpaintModelTester():
+    """
+    Class to test data with a trained model with inpainting
+    """
+    def __init__(self, model, dico_set_loaders, kl_weight, loss_func,
+                n_latent, depth):
+        """
+        Args:
+            model: trained model to use
+            dico_set_loaders: dictionnary of type:
+                                            {"test_set_1": test_set_1_loader}
+            kl_weight: beta value
+            loss_func: reconstruction criterion
+            n_latent: size of latent space
+            depth: depth of the model
+
+        Returns:
+            results: dictionnary of type:
+                {"test_set_1": {"x1": latent_embedding_x1},
+                               {"x2": latent_embedding_x2}
+                }
+        """
+        if torch.cuda.is_available():
+            device = "cuda:0"
+        self.model = model
+        self.model.to(device)
+        self.dico_set_loaders = dico_set_loaders
+        self.kl_weight = kl_weight
+        self.n_latent = n_latent
+        self.depth = depth
+        self.loss_func = loss_func
+
+    def test(self):
+        id_arr, input_arr, phase_arr, output_arr = [], [], [], []
+        self.list_loss_train, self.list_loss_val = [], []
+        device = torch.device("cuda", index=0)
+
+        results = {k:{} for k in self.dico_set_loaders.keys()}
+
+        for loader_name, loader in self.dico_set_loaders.items():
+            print(loader_name)
+            self.model.eval()
+            with torch.no_grad():
+                for distmap_masked_dict, distmap, path in loader:
+                    out_z = []
+                    list_out_z = []
+                    list_loss_val = []
+                    list_recon_loss_val = []
+                    print(distmap_masked_dict.keys())
+                    print(path)
+                    for ss_size, ss in distmap_masked_dict.items():
+                        inputs = Variable(ss).to(device, dtype=torch.float32)
+                        distmap = Variable(distmap).to(device, dtype=torch.float32)
+                        output, z, logvar = self.model(inputs)
+                        #target = torch.squeeze(inputs, dim=1).long()
+                        recon_loss_val, kl_val, loss_val = vae_loss(distmap, output, z, logvar, self.loss_func,
+                                        kl_weight=self.kl_weight)
+                        out_z = np.array(np.squeeze(z).cpu().detach().numpy())
+
+                        list_out_z.append(out_z)
+                        list_loss_val.append(float(loss_val.cpu().detach().numpy()))
+                        list_recon_loss_val.append(float(recon_loss_val.cpu().detach().numpy()))
+                    print('len',len(list_loss_val))
+                    for k in range(len(path)):
+                        out_z = np.array(np.squeeze(z[k]).cpu().detach().numpy())
+                        results[loader_name][path[k]] = list_loss_val, list_recon_loss_val
+                        #results[loader_name][path[k]] = loss_val, out_z, recon_loss_val, inputs, output
+
+        return results
