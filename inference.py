@@ -50,59 +50,8 @@ import dico_toolbox as dtx
 import deep_folding as df
 from config import Config
 
+from preprocess import convert2Distmap, ApplyMask, Padding, NormalizeSkeleton
 
-class SkeletonDataset():
-    """Custom dataset for skeleton images that includes image file paths.
-
-    Args:
-        dataframe: dataframe containing training and testing arrays
-        filenames: optional, list of corresponding filenames
-
-    Returns:
-        tuple_with_path: tuple of type (sample, filename) with sample normalized
-                         and padded
-    """
-    def __init__(self, dataframe, filenames, data_transforms):
-        torch.manual_seed(17)
-        self.df = dataframe
-        self.filenames = filenames
-        self.data_transforms = data_transforms
-        self.config = Config()
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
-        if self.config.model == 'vae':
-            if len(self.filenames)>0:
-                filename = self.filenames[idx]
-                idx = np.where(self.filenames==filename)
-                sample = self.df[idx]
-
-            fill_value = 0
-            if self.data_transforms:
-                sample = np.squeeze(sample)
-                self.transform = transforms.Compose([
-                                        RotateTensor(filename),
-                                        ApplyMask(),
-                                        NormalizeSkeleton(),
-                                        Padding(list(self.config.in_shape),
-                                                fill_value=fill_value)
-                                        ])
-            else:
-                #sample = np.squeeze(sample, axis=4)
-                sample = np.squeeze(sample)
-                self.transform = transforms.Compose([
-                                        NormalizeSkeleton(),
-                                        ApplyMask(),
-                                        Padding(list(self.config.in_shape),
-                                                fill_value=fill_value)
-                                        ])
-            tuple_with_path = (self.transform(sample), filename)
-            return tuple_with_path
 
 
 class InpaintDatasetTest():
@@ -132,15 +81,19 @@ class InpaintDatasetTest():
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
+            print(idx)
 
         if self.config.model == 'vae':
             if len(self.filenames)>0:
+                print(1)
                 filename = self.filenames[idx]
+                print(filename)
                 idx_foldlabel = np.where(self.filenames==filename)
                 foldlabel = self.foldlabel[idx]
                 skeleton = self.skeletons[idx]
                 distmap = self.distmaps[idx]
                 if self.flag:
+                    print(2)
                     foldlabel_test, skeleton_test = foldlabel.copy(), skeleton.copy()
                     foldlabel_test[foldlabel_test>0] = 1
                     skeleton_test[skeleton_test>0] = 1
@@ -148,46 +101,29 @@ class InpaintDatasetTest():
                     assert(np.array_equal(foldlabel_test,skeleton_test))
                     #print(7)
                     self.flag =False
-                # aims.write(aims.Volume(np.squeeze(foldlabel_test)), f"/tmp/foldlabel_{idx}.nii.gz")
-                # aims.write(aims.Volume(np.squeeze(skeleton_test)), f"/tmp/skeleton_{idx}.nii.gz")
-                # aims.write(aims.Volume(np.squeeze(distmap)), f"/tmp/distmap_{idx}.nii.gz")
                 angle = np.random.uniform(-3, 3)
 
             fill_value = 0
-            if self.data_transforms:
-                mask = transforms.Compose([ApplyMask()])
-                foldlabel = mask(foldlabel)
-                inpaint = transforms.Compose([randomSuppression(foldlabel)])
-                #aims.write(dtx.convert.volume_to_bucketMap_aims(np.squeeze(skeleton)), f"/tmp/skel_{idx}.bck")
-                skeleton, target = inpaint(skeleton)
-                #aims.write(dtx.convert.volume_to_bucketMap_aims(np.squeeze(skeleton)), f"/tmp/skel_masked_{idx}.bck")
-                #aims.write(aims.Volume(np.squeeze(foldlabel_test)), f"/tmp/foldlabel_{idx}.nii.gz")
-                distmap_masked = convert2Distmap(skeleton)
-                self.transform = transforms.Compose([
-                                        RotateTensor(filename, angle),
-                                        ApplyMask(),
-                                        NormalizeSkeleton(),
-                                        Padding(list(self.config.in_shape),
-                                                fill_value=fill_value)
-                                        ])
-                distmap_masked = np.squeeze(distmap_masked)
-                distmap = np.squeeze(distmap)
-                #target = np.squeeze(target)
+            print(3)
+            mask = transforms.Compose([ApplyMask()])
+            foldlabel = mask(foldlabel)
+            aims.write(aims.Volume(np.squeeze(np.array(foldlabel))), f"/tmp/foldlabel_{idx}_mask.nii.gz")
+            # List of simple surfaces
+            print(4)
+            folds_list = np.unique(foldlabel, return_counts=True)
+            folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>=300}
+            #folds_dico.pop(0, None)
+            distmap_masked_dict = {}
 
-                tuple_with_path = (self.transform(distmap_masked),
-                                   self.transform(distmap),
-                                   filename)
-                # aims.write(aims.Volume((np.squeeze(distmap_masked))), f"/tmp/dist_masked_{idx}.nii.gz")
-                # aims.write(aims.Volume((np.squeeze(distmap))), f"/tmp/dist_{idx}.nii.gz")
-            else:
-                mask = transforms.Compose([ApplyMask()])
-                foldlabel = mask(foldlabel)
-                # List of simple surfaces
-                folds_list = np.unique(self.foldlabel, return_counts=True)
-                folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>=300}
-
-                for ss, ss_size in folds_dico.items():
-                    inpaint = transforms.Compose([inferenceSuppression(foldlabel)])
+            for ss, ss_size in folds_dico.items():
+                if ss!=0:
+                    print(ss, ss_size)
+                    inpaint = transforms.Compose([inferenceSuppression(foldlabel, ss)])
+                    aims.write(dtx.convert.volume_to_bucketMap_aims(np.squeeze(np.array((mask(skeleton))))), f"/tmp/skel_{idx}_{ss}.bck")
+                    skeleton_del, target = inpaint(skeleton)
+                    #print(np.unique(foldlabel, return_counts=True))
+                    aims.write(dtx.convert.volume_to_bucketMap_aims(np.squeeze(np.array(mask(skeleton_del)))), f"/tmp/skel_masked_{idx}_{ss}.bck")
+                    distmap_masked = convert2Distmap(skeleton_del)
 
                     self.transform = transforms.Compose([
                                         NormalizeSkeleton(),
@@ -196,173 +132,47 @@ class InpaintDatasetTest():
                                                 fill_value=fill_value)
                                         ])
                     distmap = np.squeeze(distmap)
-                    #target = np.squeeze(target)
+                    distmap_masked = np.squeeze(distmap_masked)
+                    distmap_masked_dict[ss_size] = self.transform(distmap_masked)
 
-                    tuple_with_path = (self.transform(distmap),
-                                   self.transform(distmap),
-                                   filename)
+            tuple_with_path = (distmap_masked_dict,
+                               self.transform(distmap),
+                               filename)
 
             return tuple_with_path
 
-def convert2Distmap(skeleton):
+
+
+
+class inferenceSuppression(object):
     """
     """
-    temp_dir = tempfile.mkdtemp()
-    temp_file_skel = f"{temp_dir}/skel.nii.gz"
-
-    vol_skel = aims.Volume(skeleton)
-    aims.write(vol_skel, temp_file_skel)
-    temp_file_distmap = f"{temp_dir}/distmap.nii.gz"
-    cmd_distMap = 'AimsChamferDistanceMap' + \
-    ' -i ' + temp_file_skel + \
-    ' -o ' + temp_file_distmap + \
-    ' -s OUTSIDE'
-    os.system(cmd_distMap)
-    vol_distmap = aims.read(temp_file_distmap)
-    distmap = np.asarray(vol_distmap)
-
-    # os.remove(temp_file_skel)
-    # os.remove(temp_file_distmap)
-    shutil.rmtree(temp_dir)
-
-    return distmap
-
-
-class ApplyMask(object):
-    """Apply specific sulcus mask
-    """
-    def __init__(self):
-        self.config = Config()
-
-        mask = aims.read(os.path.join(self.config.aug_dir,
-                                      'mask_cropped.nii.gz'))
-        self.mask = np.asarray(mask)
-        self.mask = np.squeeze(self.mask)
-
-    def __call__(self, arr):
-        arr[self.mask==0] = 0
-        arr = np.expand_dims(arr, axis=0)
-
-        return torch.from_numpy(arr)
-
-class RotateTensor(object):
-    """Apply a random rotation on the images
-    """
-
-    def __init__(self, filename, angle, max_angle=3):
-        #torch.manual_seed(17)
-        self.config = Config()
-        self.filename = filename
-        self.max_angle = max_angle
-        self.angle = angle
-
-    def __call__(self, arr):
-        arr_shape = arr.shape
-
-        for axis in [(0, 1), (0, 2), (1, 2)]:
-            #angle = np.random.uniform(-self.max_angle, self.max_angle)
-            #arr = rotate(arr, angle, axes=axis, reshape=False)
-            arr = rotate(arr, self.angle, axes=axis, reshape=False)
-
-        return torch.from_numpy(arr)
-
-
-class randomSuppression(object):
-    """
-    """
-    def __init__(self, foldlabel, min_size=100):
-        self.foldlabel = np.squeeze(foldlabel, axis=0)
+    def __init__(self, foldlabel, ss, min_size=100):
+        foldlabel = np.squeeze(foldlabel, axis=0)
+        self.foldlabel_del = np.copy(foldlabel)
+        self.fold = ss
         self.min_size = min_size
 
-    def random_choice(self):
-        folds_list = np.unique(self.foldlabel, return_counts=True)
-        folds_dico = {key: value for key, value in zip(folds_list[0], folds_list[1]) if value>=300}
-        # We don't take into account the background in the random choice of fold
-        folds_dico.pop(0, None)
-
-        # Random choice of fold
-        try:
-            self.fold = random.choice(list(folds_dico.keys()))
-        except IndexError:
-            pass
-
     def __call__(self, skeleton):
-        target = np.zeros(list(skeleton.shape))
-        assert(target.shape==skeleton.shape)
+        skeleton_del = np.copy(skeleton)
+        target = np.zeros(list(skeleton_del.shape))
+        assert(target.shape==skeleton_del.shape)
 
-        if random.random()>0.2:
-            self.random_choice()
-            # Selection of selected simple surface
-            self.foldlabel[self.foldlabel==self.fold] = 9999
-            # Selection of associated bottom
-            self.foldlabel[self.foldlabel==self.fold + 6000] = 9999
-            # Selection of other associated junction
-            self.foldlabel[self.foldlabel==self.fold + 5000] = 9999
+        # Selection of selected simple surface
+        self.foldlabel_del[self.foldlabel_del==self.fold] = 9999
+        # Selection of associated bottom
+        self.foldlabel_del[self.foldlabel_del==self.fold + 6000] = 9999
+        # Selection of other associated junction
+        self.foldlabel_del[self.foldlabel_del==self.fold + 5000] = 9999
 
-            ## suppression of chosen folds
-            skeleton[self.foldlabel==9999] = -1
-            assert(np.count_nonzero(skeleton==-1)>=300)
-            #print(np.count_nonzero(skeleton==-1))
-            skeleton[skeleton==-1] = 0
-            #skeleton[skeleton==-1] = 1
+        ## suppression of chosen folds
+        skeleton_del[self.foldlabel_del==9999] = -1
+        assert(np.count_nonzero(skeleton_del==-1)>=300)
+        #print(np.count_nonzero(skeleton==-1))
+        skeleton_del[skeleton_del==-1] = 0
+        #skeleton[skeleton==-1] = 1
 
-            ## writing of deleted folds to reconstruct in target
-            target[self.foldlabel==9999] = 1
+        ## writing of deleted folds to reconstruct in target
+        target[self.foldlabel_del==9999] = 1
 
-        return skeleton, target
-
-
-class NormalizeSkeleton(object):
-    """
-    Class to normalize skeleton objects,
-    black voxels: 0
-    grey and white voxels: 1
-    """
-    def __init__(self, distmap=True, nb_cls=None):
-        """ Initialize the instance"""
-        self.nb_cls = nb_cls
-        self.distmap = distmap
-
-    def __call__(self, arr):
-        if self.nb_cls==2:
-            arr[arr > 0] = 1
-        elif self.distmap==True:
-            arr[arr!=0] = 1 - (2 * expit(arr[arr!=0]) - 1)
-            # arr[arr!=0] = np.tanh(arr[arr!=0])
-
-        return arr
-
-
-class Padding(object):
-    """ Apply a padding.
-    Parameters
-    ----------
-    arr: array
-        the input data.
-    shape: list of int
-        the desired shape.
-    fill_value: int, default 0
-        the value used to fill the array.
-    Returns
-    -------
-    transformed: array
-        the transformed input data.
-    """
-    def __init__(self, shape, fill_value=0):
-        self.shape = shape
-        self.fill_value = fill_value
-
-    def __call__(self, arr):
-        orig_shape = arr.shape
-        padding = []
-        for orig_i, final_i in zip(orig_shape, self.shape):
-            shape_i = final_i - orig_i
-            half_shape_i = shape_i // 2
-            if shape_i % 2 == 0:
-                padding.append((half_shape_i, half_shape_i))
-            else:
-                padding.append((half_shape_i, half_shape_i + 1))
-        for cnt in range(len(arr.shape) - len(padding)):
-            padding.append((0, 0))
-        return np.pad(arr, padding, mode="constant",
-                      constant_values=self.fill_value)
+        return skeleton_del, target
